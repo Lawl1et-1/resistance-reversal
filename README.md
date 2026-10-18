@@ -81,7 +81,7 @@ come out partly negative.
 ```bash
 pip install -r requirements.txt
 make test        # test suite
-make smoke       # whole pipeline on a small profile, CPU, under 10 minutes
+make smoke       # whole pipeline on a small profile, CPU, ~15 min measured
 make reproduce   # full profile; regenerates every table and figure
 ```
 

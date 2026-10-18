@@ -7,7 +7,7 @@ LOGS  := logs
 
 help:
 	@echo "make test       - run the test suite"
-	@echo "make smoke      - tests plus every experiment on the smoke profile (CPU, <10 min)"
+	@echo "make smoke      - tests plus every experiment on the smoke profile (CPU, ~15 min measured)"
 	@echo "make reproduce  - full profile; regenerates every table and figure (hours on CPU)"
 	@echo "make h1|h2|h3   - a single hypothesis on the full profile, as a background job"
 	@echo "make figures    - rebuild figures from results/"
