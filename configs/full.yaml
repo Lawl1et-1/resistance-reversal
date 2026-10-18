@@ -1,0 +1,51 @@
+# Full profile. Sized for CPU: the development machine has no CUDA device, so this must
+# stay feasible without a GPU rather than assuming one.
+profile: full
+provenance: synthetic
+
+simulator:
+  n_genes: 200
+  n_regulators: 20
+  n_program: 40
+  n_reg_modules: 5
+  module_coexpr: 0.3
+
+data:
+  k: 2                    # library holds singles and pairs; triples are search-only
+  n_pairs: null           # null = exhaustive pairs (190 at 20 regulators)
+  n_cells: 64
+  n_control_cells: 256
+  n_contexts: 3
+  context_strength: 0.25
+  sensitivity_cells: 800
+
+encoder:
+  latent_dim: 32
+  n_hvg: null
+
+pertflow:
+  steps: 8000
+  hidden: 256
+  set_dim: 32
+  n_ensemble: 5
+  lr: 0.003
+  batch_size: 512
+  n_flow_steps: 20
+  n_eval_cells: 128
+
+conformal:
+  alpha: 0.1
+
+search:
+  k: 3
+  lambdas: [0.0, 0.5, 1.0, 2.0]
+  strategies: [exhaustive, greedy, beam, evolutionary]
+  oracle_cells: 32
+
+active:
+  n_initial: 20
+  n_rounds: 8
+  batch_size: 5
+  n_repeats: 10
+
+seeds: [0, 1, 2, 3, 4]

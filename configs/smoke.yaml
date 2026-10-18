@@ -1,0 +1,51 @@
+# Smoke profile: the whole pipeline, small enough to finish on CPU in a few minutes.
+# Its job is to prove every stage runs and wires together, not to support any claim.
+profile: smoke
+provenance: synthetic
+
+simulator:
+  n_genes: 60
+  n_regulators: 12
+  n_program: 15
+  n_reg_modules: 4
+  module_coexpr: 0.3
+
+data:
+  k: 2                    # max perturbation set size in the library
+  n_pairs: 40             # sampled pairs (null would be exhaustive)
+  n_cells: 32
+  n_control_cells: 120
+  n_contexts: 2
+  context_strength: 0.25
+  sensitivity_cells: 300
+
+encoder:
+  latent_dim: 16
+  n_hvg: null
+
+pertflow:
+  steps: 400
+  hidden: 64
+  set_dim: 16
+  n_ensemble: 3
+  lr: 0.003
+  batch_size: 256
+  n_flow_steps: 20
+  n_eval_cells: 64
+
+conformal:
+  alpha: 0.1
+
+search:
+  k: 2
+  lambdas: [0.0, 1.0]
+  strategies: [exhaustive, greedy, beam, evolutionary]
+  oracle_cells: 16
+
+active:
+  n_initial: 6
+  n_rounds: 4
+  batch_size: 2
+  n_repeats: 3
+
+seeds: [0, 1]

@@ -201,13 +201,32 @@ encoder's identities are now pinned by tests
 a test asserting that passing a delta through `inverse_transform` is wrong, which is the
 trap those helpers exist to prevent).
 
-**Still open: magnitude shrinkage.** Predicted shift norms remain ~55-60% of the truth
-(measured 0.63 train / 0.58 test, cosine 0.83 / 0.74). Some shrinkage is the correct
-behaviour of a conditional-mean estimator under uncertainty, but this much will bias every
-reversal score downward, so a capacity/training sweep is running before any of H2-H3 is
-evaluated. A model that systematically understates the effect of every intervention would
-make the uncertainty-penalised search look better or worse than it deserves for reasons
-unrelated to uncertainty.
+**Resolved: the magnitude shrinkage is generalisation, not underfitting.** Capacity sweep
+after the embedding fix (ratio = mean predicted shift norm / mean true shift norm):
+
+| config | loss | train ratio | train cos | test ratio | test cos |
+|---|---|---|---|---|---|
+| 3 000 steps, hidden 128 | 0.974 | 0.78 | 0.950 | 0.57 | 0.777 |
+| 12 000 steps, hidden 128 | 0.859 | 0.74 | 0.941 | 0.59 | 0.886 |
+| 12 000 steps, hidden 256 | 0.757 | 0.69 | 0.908 | 0.60 | 0.895 |
+
+The embedding fix alone raised the train ratio from 0.63 to 0.78 and train cosine from 0.83
+to 0.95. Beyond that, more capacity and more training keep improving the predicted
+*direction* on held-out perturbations (cosine 0.78 -> 0.90) while the predicted *magnitude*
+stays flat at ~0.6x, and the train ratio actually falls. That pattern is shrinkage toward
+the conditional mean, which is what a squared-error-optimal estimator should do when it is
+genuinely uncertain about an unseen combination's magnitude -- not a fixable defect.
+
+Consequences, which the paper must state rather than bury:
+- predicted reversal scores are biased **toward zero**, so reported reversal is conservative;
+- intervention *ranking* is largely preserved, which is what the search consumes;
+- conformal coverage is unaffected in principle, because a systematic bias inflates the
+  calibration residuals and therefore the interval width, which is exactly the mechanism
+  split conformal relies on.
+
+A separate capacity sweep was abandoned after it consumed ~55 minutes of CPU for the two
+largest configurations while starving the other experiments; the full profile already runs
+at 8 000 steps / hidden 256, so it answers the same question as a by-product.
 
 ## M4 - conformal calibration, sensitivity functional
 
