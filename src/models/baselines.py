@@ -243,6 +243,25 @@ class OracleLatent(ResponseModel):
         z0 = self.encoder_.transform(self.data_.cells(CONTROL, context)).mean(axis=0)
         return z - z0
 
+    def sample_latent(self, pert, context, z0, n: int = 128):
+        """The observed post-perturbation cells themselves.
+
+        Without this the oracle's "predicted population" would be the control cells shifted
+        by the true mean delta, and an additive shift cannot represent a population moving
+        into a different attractor -- which is precisely what reversal is. The oracle then
+        scores *worse* at ranking interventions than a model that samples a population,
+        which made it useless as an upper bound and actively misleading as a diagnostic of
+        whether a sensitivity readout is trustworthy.
+        """
+        cells = self.data_.cells(pert, context)
+        if not len(cells):
+            return np.atleast_2d(z0)
+        z = self.encoder_.transform(cells)
+        if len(z) >= n:
+            return z[:n]
+        idx = np.random.default_rng(0).integers(0, len(z), size=n)
+        return z[idx]
+
 
 @dataclass
 class ShuffledLabels(RidgeEmbedding):
