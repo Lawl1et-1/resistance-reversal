@@ -201,9 +201,84 @@ encoder's identities are now pinned by tests
 a test asserting that passing a delta through `inverse_transform` is wrong, which is the
 trap those helpers exist to prevent).
 
-**Still open: magnitude shrinkage.** Predicted shift norms remain ~55-60% of the truth. Some
-shrinkage is the correct behaviour of a conditional-mean estimator under uncertainty, but
-this much will bias every reversal score downward, so a capacity/training sweep is running
-before any of H2-H3 is evaluated. A model that systematically understates the effect of
-every intervention would make the uncertainty-penalised search look better or worse than it
-deserves for reasons unrelated to uncertainty.
+**Still open: magnitude shrinkage.** Predicted shift norms remain ~55-60% of the truth
+(measured 0.63 train / 0.58 test, cosine 0.83 / 0.74). Some shrinkage is the correct
+behaviour of a conditional-mean estimator under uncertainty, but this much will bias every
+reversal score downward, so a capacity/training sweep is running before any of H2-H3 is
+evaluated. A model that systematically understates the effect of every intervention would
+make the uncertainty-penalised search look better or worse than it deserves for reasons
+unrelated to uncertainty.
+
+## M4 - conformal calibration, sensitivity functional
+
+Split conformal with the normalised score `|y - yhat| / spread` is implemented with the
+standard finite-sample quantile (the `ceil((n+1)(1-alpha))`-th smallest calibration score)
+and returns an **infinite** radius when the calibration set is too small to certify the
+requested level, rather than a silently invalid interval. 20 tests, including the coverage
+guarantee verified on constructed exchangeable data at alpha in {0.05, 0.1, 0.2} over 300
+trials, heteroscedastic coverage, interval adaptivity, and selective risk falling only when
+uncertainty is actually informative.
+
+The exchangeability assumption is stated in the module and will be **violated by design** on
+the unseen-context split, where coverage is reported separately and expected to miss
+nominal.
+
+**Failure 9: the per-cell module drive was flipping cells between attractors.** The
+sensitivity classifier reached only 0.666 held-out accuracy, which looked like a modelling
+failure. It was not: at `module_coexpr = 0.9`, 33.7% of cells relaxed to the attractor
+*opposite* their assigned phenotype label, so 0.666 was essentially the Bayes limit
+(1 - 0.337 = 0.663). The labels were a third noise.
+
+This is a direct tension between two requirements, measured across the parameter:
+
+| `module_coexpr` | label noise | within-module \|r\| | across-module \|r\| |
+|---|---|---|---|
+| 0.0 | 0.000 | 0.04 | 0.04 |
+| 0.2 | 0.027 | 0.39 | 0.04 |
+| **0.3** | **0.096** | **0.53** | **0.04** |
+| 0.6 | 0.255 | 0.74 | 0.05 |
+| 0.9 | 0.333 | 0.80 | 0.05 |
+
+Co-expression has to be strong enough for held-out-gene transfer (Failure 5) but a large
+per-cell drive on the regulators pushes cells across the separatrix. Set to 0.3: pathway
+signal unambiguous (13x within/across ratio), label noise 10%. Sensitivity accuracy then
+rose to 0.901 (single-cell) and 0.890 (signature), which is at the ~0.90 ceiling the
+residual label noise allows. The remaining noise is realistic -- persister/sensitive labels
+in real data are not clean -- and makes `s` an explicitly imperfect proxy, which is the
+caveat the paper has to carry anyway.
+
+**Failure 10: SVD truncation of the gene embeddings destroyed the signal it existed to
+carry.** Correlation between embedding distance and true effect distance (positive means
+similar profile implies similar effect):
+
+| representation | 60 genes | 200 genes |
+|---|---|---|
+| full co-expression profile | **+0.67** | +0.52 |
+| top-8 SVD | -0.30 | +0.23 |
+| top-16 SVD (the previous default) | **-0.39** | +0.23 |
+| top-32 SVD | +0.25 | +0.22 |
+
+The leading components of the gene-gene correlation matrix track global program structure;
+module membership lives further down, so truncating to 16 dimensions discarded exactly the
+relevant variation. At 60 genes the truncated embedding points the *wrong way*, meaning a
+model using it would transfer away from functionally similar genes. Default changed to the
+full standardised co-expression profile, with the measurements recorded at the function so
+the hyperparameter is not "tuned" back later.
+
+**A real and reportable disagreement between the two sensitivity readouts.** On a true
+oracle reversal (true sensitivity 0.101 -> 0.980), the two readouts disagree sharply:
+
+| readout | control | after oracle reversal |
+|---|---|---|
+| true sensitivity (simulator) | 0.101 | 0.980 |
+| signature / "bulk" | 0.205 | 0.950 |
+| single-cell latent classifier | 0.107 | **0.225** |
+
+The low-capacity signature readout tracks the reversal; the 32-dimensional latent classifier
+barely moves. Both were fitted on *unperturbed* cells, and a knockdown drives its target gene
+far outside that training range, so the latent classifier is extrapolating while the
+signature (an average over many program genes) is not. This is precisely the domain shift the
+brief says to expect, and it is the single most important caveat in the project: the headline
+reversal number depends on which proxy is used. Both are reported everywhere, never averaged
+into one number. Whether regularising the latent classifier narrows the gap is still to be
+checked -- an under-regularised classifier would be a straw man.

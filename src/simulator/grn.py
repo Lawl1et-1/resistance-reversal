@@ -28,7 +28,15 @@ class GRNConfig:
     n_regulators: int = 20
     n_program: int = 40  # readout genes per program (sensitive / resistance)
     n_reg_modules: int = 5  # pathway-like groups of regulators
-    module_coexpr: float = 0.9  # per-cell shared variation within a module
+    # Per-cell shared variation within a module. This trades two requirements against each
+    # other: co-expression has to be strong enough that a model can transfer to a held-out
+    # gene (LOG.md Failure 5), but a large per-cell drive on the regulators pushes cells
+    # across the separatrix, so the phenotype label stops matching the attractor the cell
+    # actually reaches. Measured label noise (fraction of cells on the wrong side of
+    # s = 0.5): 0.0 at coexpr 0.0, 0.10 at 0.3, 0.26 at 0.6, 0.34 at 0.9. At 0.3,
+    # within-module |r| is 0.53 against 0.04 across modules, so the pathway signal is
+    # unambiguous while the sensitivity labels stay mostly correct.
+    module_coexpr: float = 0.3
     w_self: float = 3.5
     w_cross: float = 3.5
     w_program: float = 3.0

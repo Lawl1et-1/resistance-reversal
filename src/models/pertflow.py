@@ -105,7 +105,7 @@ class PertFlow(ResponseModel):
     n_ensemble: int = 5
     hidden: int = 128
     set_dim: int = 32
-    emb_dim: int = 16
+    emb_dim: int | None = None
     mode: str = "flow"  # "flow" | "mlp"
     steps: int = 1500
     batch_size: int = 256

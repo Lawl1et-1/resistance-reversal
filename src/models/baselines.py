@@ -49,14 +49,32 @@ def build_targets(
 
 
 def gene_embeddings(
-    data: PerturbData, split: Split, dim: int = 16, seed: int = 0
+    data: PerturbData, split: Split, dim: int | None = None, seed: int = 0
 ) -> np.ndarray:
     """Per-gene embeddings from co-expression on training cells only.
 
-    This is what lets a linear model say anything at all about a gene it never perturbed:
-    an unseen gene inherits a prediction from genes with similar co-expression profiles.
-    Computed over all genes (not the HVG subset) because the perturbable regulators are
-    not guaranteed to survive HVG selection.
+    A gene is represented by its co-expression profile: its correlation to every gene,
+    standardised per dimension. This is what lets a model say anything at all about a gene
+    it never perturbed -- an unseen gene inherits a prediction from genes with similar
+    profiles. Correlations use all genes (not the HVG subset), because the perturbable
+    regulators are not guaranteed to survive HVG selection, and only training cells, so a
+    held-out gene's profile comes from cells where it was never perturbed.
+
+    `dim` optionally truncates to the leading SVD components. **Leave it None.** Truncation
+    was measured to destroy the very signal the embedding exists to carry: the leading
+    components of the gene-gene correlation matrix track global program structure, while
+    module membership lives further down. Correlation of embedding distance with true
+    effect distance, where positive means "similar profile, similar effect":
+
+    | representation | 60 genes | 200 genes |
+    |---|---|---|
+    | full profile (dim=None) | **+0.67** | +0.52 |
+    | top-8 SVD | -0.30 | +0.23 |
+    | top-16 SVD | -0.39 | +0.23 |
+    | top-32 SVD | +0.25 | +0.22 |
+
+    The truncated versions are not merely weaker; at 60 genes they point the wrong way, so
+    a model using them would transfer *away* from functionally similar genes.
     """
     X = data.X[training_cell_mask(data, split)]
     X = X - X.mean(axis=0)
@@ -66,10 +84,11 @@ def gene_embeddings(
     corr[:, sd < 1e-8] = 0.0
     corr[sd < 1e-8, :] = 0.0
 
-    # Truncated SVD of the (symmetric) co-expression matrix.
-    u, s, _ = np.linalg.svd(corr, full_matrices=False)
-    d = min(dim, u.shape[1])
-    emb = u[:, :d] * s[:d]
+    emb = corr
+    if dim is not None:
+        u, s, _ = np.linalg.svd(corr, full_matrices=False)
+        d = min(dim, u.shape[1])
+        emb = u[:, :d] * s[:d]
 
     # Standardise per dimension. Dividing by a global maximum (the obvious thing) leaves
     # the trailing dimensions at ~0.05 scale while the latent state the conditioning is
@@ -157,7 +176,7 @@ class RidgeEmbedding(ResponseModel):
 
     name: str = "ridge_embedding"
     alpha: float = 1.0
-    emb_dim: int = 16
+    emb_dim: int | None = None
     use_context: bool = True
 
     def fit(self, data, split, encoder):
