@@ -18,6 +18,7 @@ data:
   n_contexts: 2
   context_strength: 0.25
   sensitivity_cells: 300
+  max_reversal_perts: 12   # cap reversal scoring so `make smoke` stays inside 10 min
 
 encoder:
   latent_dim: 16

@@ -107,25 +107,38 @@ def reversal_table(setup: Setup, split_name: str, models: list, cfg: dict) -> pd
     )
     z0 = resistant_control_latents(setup, split_name)
     testable = [p for p in split.test if tuple(sorted(p)) in truth]
+    # Scoring reversal costs one model evaluation per (model, perturbation), and the
+    # unseen-context split has every library perturbation in its test set. The cap keeps the
+    # smoke profile inside its time budget; it is recorded in the output and the full
+    # profile leaves it unset.
+    cap = cfg["data"].get("max_reversal_perts")
+    if cap and len(testable) > cap:
+        stride = max(1, len(testable) // cap)
+        testable = testable[::stride][:cap]
     if not testable:
         return pd.DataFrame()
 
+    readouts = [(sens.primary.name, sens.primary), (sens.secondary.name, sens.secondary)]
+    baselines = {name: float(np.mean(r(z0))) for name, r in readouts}
+    context = split.test_contexts[0]
+
     rows = []
     for model in models:
-        for readout_name, readout in (
-            (sens.primary.name, sens.primary),
-            (sens.secondary.name, sens.secondary),
-        ):
-            obj = ReversalObjective(
-                model=model,
-                sensitivity=readout,
-                encoder=encoder,
-                z0=z0,
-                context=split.test_contexts[0],
-                n_samples=cfg["pertflow"]["n_eval_cells"],
-            )
-            for pert in testable:
-                rec = obj.score(pert)
+        # The predicted population does not depend on the readout, so it is computed once
+        # per (model, perturbation) and both readouts are applied to it. Scoring it per
+        # readout instead doubles the cost, and each PertFlow prediction integrates an ODE
+        # for every ensemble member over a cell population.
+        obj = ReversalObjective(
+            model=model,
+            sensitivity=sens.primary,
+            encoder=encoder,
+            z0=z0,
+            context=context,
+            n_samples=cfg["pertflow"]["n_eval_cells"],
+        )
+        for pert in testable:
+            z_pred = obj.predict_population(pert)
+            for readout_name, readout in readouts:
                 rows.append(
                     {
                         "model": getattr(model, "name", type(model).__name__),
@@ -134,7 +147,7 @@ def reversal_table(setup: Setup, split_name: str, models: list, cfg: dict) -> pd
                         "seed": setup.seed,
                         "pert": pert_label(pert),
                         "size": len(pert),
-                        "reversal_pred": rec["reversal"],
+                        "reversal_pred": float(np.mean(readout(z_pred))) - baselines[readout_name],
                         "reversal_true": truth[tuple(sorted(pert))],
                     }
                 )
