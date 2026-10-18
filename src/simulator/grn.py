@@ -27,6 +27,8 @@ class GRNConfig:
     n_genes: int = 200
     n_regulators: int = 20
     n_program: int = 40  # readout genes per program (sensitive / resistance)
+    n_reg_modules: int = 5  # pathway-like groups of regulators
+    module_coexpr: float = 0.9  # per-cell shared variation within a module
     w_self: float = 3.5
     w_cross: float = 3.5
     w_program: float = 3.0
@@ -57,6 +59,7 @@ class GRN:
     b: np.ndarray
     regulators: np.ndarray  # gene indices that may be perturbed
     reg_effect: np.ndarray  # (n_regulators, 2) signed drive onto [sensitive, resistance]
+    reg_module: np.ndarray  # (n_regulators,) pathway membership
     program_sensitive: np.ndarray
     program_resistance: np.ndarray
     _truth_cache: dict = field(default_factory=dict, repr=False)
@@ -87,16 +90,32 @@ def build_grn(cfg: GRNConfig) -> GRN:
     # separatrix toward sensitivity. Magnitudes are set so single knockdowns usually
     # cannot clear the hysteresis barrier but the right pair or triple can -- the
     # synergy regime that makes combinatorial generalisation the interesting part.
+    #
+    # Regulators are grouped into pathway-like modules. Members of a module share an
+    # effect type and (via sample_cell_bias) co-express. Without this, upstream regulators
+    # are mutually independent, co-expression carries no information about what a gene
+    # does, and generalising to a *held-out gene* is impossible for any model -- the
+    # unseen-single split would measure nothing. Modules are what make that split a real
+    # test: the information needed to transfer exists, and whether a model exploits it is
+    # then an empirical question.
+    reg_module = np.arange(cfg.n_regulators) % cfg.n_reg_modules
+    module_mode = {m: int(m % 4) for m in range(cfg.n_reg_modules)}
+    module_mag = {
+        m: cfg.w_regulator * (rng.uniform(0.85, 1.0) if module_mode[m] == 0 else rng.uniform(0.45, 1.0))
+        for m in range(cfg.n_reg_modules)
+    }
+
     reg_effect = np.zeros((cfg.n_regulators, 2))
     for i in range(cfg.n_regulators):
-        mode = i % 4
-        mag = cfg.w_regulator * rng.uniform(0.45, 1.0)
+        mode = module_mode[int(reg_module[i])]
+        # Shared module magnitude with a little per-gene spread, so module membership is
+        # informative about effect without making members interchangeable.
+        mag = module_mag[int(reg_module[i])] * rng.uniform(0.85, 1.15)
         if mode == 0:  # resistance driver
-            # Drawn near full strength so that *some* set of size <= k is always able to
-            # clear the barrier. With a wide magnitude range, unlucky seeds produce
-            # networks where no perturbation reverses at all and the experiment on that
-            # seed is vacuous; see check_reversible().
-            mag = cfg.w_regulator * rng.uniform(0.85, 1.0)
+            # Near full strength so that *some* set of size <= k can always clear the
+            # barrier. With a wide magnitude range, unlucky seeds produced networks where
+            # nothing reversed at all and that seed's experiment was vacuous; see
+            # check_reversible().
             reg_effect[i] = (-0.5 * mag, mag)
         elif mode == 1:  # sensitive driver
             reg_effect[i] = (mag, -0.5 * mag)
@@ -127,7 +146,7 @@ def build_grn(cfg: GRNConfig) -> GRN:
     for master, col in ((SENSITIVE, 0), (RESISTANCE, 1)):
         b[master] = -0.5 * (cfg.w_self - cfg.w_cross) - float(reg_effect[:, col] @ resting)
 
-    return GRN(cfg, W, b, regulators, reg_effect, program_sensitive, program_resistance)
+    return GRN(cfg, W, b, regulators, reg_effect, reg_module, program_sensitive, program_resistance)
 
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
@@ -146,6 +165,7 @@ def with_context(grn: GRN, b_offset: np.ndarray) -> GRN:
         b=grn.b + b_offset,
         regulators=grn.regulators,
         reg_effect=grn.reg_effect,
+        reg_module=grn.reg_module,
         program_sensitive=grn.program_sensitive,
         program_resistance=grn.program_resistance,
     )
@@ -182,10 +202,17 @@ def simulate(
     pert: tuple[tuple[int, int], ...] = (),
     rng: np.random.Generator | None = None,
     n_steps: int | None = None,
+    cell_bias: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Relax states to the attractor under `pert`. x0 is (n_cells, n_genes)."""
+    """Relax states to the attractor under `pert`. x0 is (n_cells, n_genes).
+
+    `cell_bias` is a persistent per-cell drive (see `sample_cell_bias`). It must persist
+    through relaxation rather than being initial-state jitter, which decays away.
+    """
     cfg = grn.cfg
     u = pert_vector(grn, pert)
+    if cell_bias is not None:
+        u = u + cell_bias
     x = np.atleast_2d(x0).copy()
     steps = cfg.n_steps if n_steps is None else n_steps
     a = cfg.alpha
@@ -195,6 +222,26 @@ def simulate(
         if cfg.state_noise and rng is not None:
             x = np.clip(x + rng.normal(0.0, cfg.state_noise, size=x.shape), 0.0, 1.0)
     return x
+
+
+def sample_cell_bias(grn: GRN, n_cells: int, rng: np.random.Generator) -> np.ndarray:
+    """Per-cell drive making module members co-express.
+
+    One latent factor per regulator module, shared by its members, plus independent
+    per-gene variation. This is the only reason co-expression carries information about a
+    gene's function here, and therefore the only reason transfer to a held-out gene is
+    possible in principle.
+    """
+    cfg = grn.cfg
+    bias = np.zeros((n_cells, grn.n_genes))
+    if not cfg.module_coexpr:
+        return bias
+    factors = rng.normal(0.0, cfg.module_coexpr, size=(n_cells, cfg.n_reg_modules))
+    for i, gene in enumerate(grn.regulators):
+        shared = factors[:, int(grn.reg_module[i])]
+        private = rng.normal(0.0, 0.35 * cfg.module_coexpr, size=n_cells)
+        bias[:, gene] = shared + private
+    return bias
 
 
 def seed_state(grn: GRN, phenotype: str, n_cells: int, rng: np.random.Generator) -> np.ndarray:

@@ -19,6 +19,7 @@ from src.simulator.grn import (
     ground_truth_reversal,
     observe,
     optimal_reversal_set,
+    sample_cell_bias,
     seed_state,
     simulate,
     true_sensitivity,
@@ -148,3 +149,65 @@ def test_observation_layer_adds_noise_and_dropout():
 def test_config_rejects_too_small_network():
     with pytest.raises(ValueError):
         GRNConfig(n_genes=10, n_regulators=20, n_program=40)
+
+
+def test_module_members_coexpress():
+    """Regulators in a module co-express; regulators in different modules do not.
+
+    Without this the unseen-gene splits are unsolvable in principle, because co-expression
+    is the only channel through which a model could learn anything about a gene it never
+    perturbed. See LOG.md Failure 5.
+    """
+    grn = smoke_grn(0)
+    rng = np.random.default_rng(0)
+    x = simulate(
+        grn,
+        seed_state(grn, "resistant", 400, rng),
+        rng=rng,
+        cell_bias=sample_cell_bias(grn, 400, rng),
+    )
+    R = grn.regulators
+    corr = np.abs(np.corrcoef(observe(grn, x, rng)[:, R].T))
+    same = grn.reg_module[:, None] == grn.reg_module[None, :]
+    off_diag = ~np.eye(len(R), dtype=bool)
+    within = corr[same & off_diag].mean()
+    across = corr[~same].mean()
+    assert within > 0.4, f"module members barely co-express ({within:.3f})"
+    assert within > across + 0.3, f"within {within:.3f} vs across {across:.3f}"
+
+
+def test_coexpression_is_informative_about_effect():
+    """Co-expression distance must track true effect distance, or transfer is impossible."""
+    grn = smoke_grn(0)
+    rng = np.random.default_rng(0)
+    x = simulate(
+        grn,
+        seed_state(grn, "resistant", 400, rng),
+        rng=rng,
+        cell_bias=sample_cell_bias(grn, 400, rng),
+    )
+    R = grn.regulators
+    corr = np.corrcoef(observe(grn, x, rng)[:, R].T)
+    effect = grn.reg_effect[:, 1] - grn.reg_effect[:, 0]
+    iu = np.triu_indices(len(R), 1)
+    # Similar co-expression (high corr) should mean similar effect (low distance).
+    d_effect = np.abs(effect[:, None] - effect[None, :])
+    assert np.corrcoef(corr[iu], d_effect[iu])[0, 1] < -0.3
+
+
+def test_cell_bias_persists_through_relaxation():
+    """A per-cell drive must survive relaxation; initial-state jitter would not."""
+    grn = smoke_grn(0)
+    rng = np.random.default_rng(0)
+    x0 = seed_state(grn, "resistant", 64, rng)
+    bias = sample_cell_bias(grn, 64, rng)
+    plain = simulate(grn, x0)
+    biased = simulate(grn, x0, cell_bias=bias)
+    spread = lambda a: a[:, grn.regulators].std(axis=0).mean()
+    assert spread(biased) > spread(plain) + 0.05
+
+
+def test_cell_bias_is_off_when_disabled():
+    grn = build_grn(GRNConfig(n_genes=60, n_regulators=12, n_program=15, module_coexpr=0.0, seed=0))
+    bias = sample_cell_bias(grn, 16, np.random.default_rng(0))
+    assert not bias.any()

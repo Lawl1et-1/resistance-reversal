@@ -68,3 +68,72 @@ and duplicate-free set enumeration, the observation layer's dropout rate, and co
 - Process noise is currently applied only when an rng is passed, which makes the oracle
   noise-free by construction. That is intended (the oracle is the simulator's exact answer)
   but means the oracle is slightly optimistic relative to any finite-sample estimate.
+
+## M2 - splits, metrics, baselines
+
+**Failure 4: the first leakage check was itself wrong.** `check_no_leakage` demanded that
+train and test perturbations be disjoint for *every* split, which fails the unseen-context
+split by construction -- there the held-out axis is the cell context and the same
+perturbations are deliberately probed in a new context. The check is now axis-aware
+(`meta["held_out_axis"]`): perturbation-axis splits require mutual disjointness, the
+context-axis split requires disjoint contexts, and train/cal disjointness is required
+either way because conformal residuals must come from unfitted perturbations. A test
+asserts that a deliberately leaked split actually raises, so the other leakage tests are
+not vacuous.
+
+**Failure 5 (the significant one): the unseen-single split was measuring nothing.**
+Every model scored ~0.00 Pearson-delta on held-out genes. Before writing that up as a
+negative result, I checked whether the split was *solvable in principle*, and it was not:
+- correlation between gene-embedding distance and true-effect distance: **-0.11**
+- mean |correlation| among regulators in control cells: **0.12** (i.e. noise)
+
+The regulators are upstream and mutually independent, so co-expression carried no
+information about what a gene does and no model could have transferred to a held-out gene.
+A "deep models fail to generalise to unseen genes" claim from that setup would have been an
+artefact of my own simulator, not a finding.
+
+Fix: regulators are now grouped into pathway-like **modules**. Members of a module share an
+effect type and magnitude (with per-gene spread, so they are not interchangeable) and
+co-express through a shared per-cell latent factor (`sample_cell_bias`). This required
+`simulate` to accept a persistent per-cell drive, since initial-state jitter decays during
+relaxation. After the fix:
+- embedding distance vs effect distance: **0.93**
+- mean |correlation| within a module **0.79**, across modules **0.06**
+- bistability and reversibility unchanged (0.96 / 0.04, best pair 0.95)
+
+The information needed to transfer now exists, so whether a model exploits it is an
+empirical question rather than a foregone conclusion. This is the same class of mistake as
+Failure 3: a degenerate setup that silently produces a publishable-looking number.
+
+**First baseline results** (synthetic, 60 genes / 12 regulators / 4 modules, 1 seed, all
+singles and pairs, 95% bootstrap CIs over perturbations; `oracle_latent` is the
+latent-reconstruction ceiling and `shuffled_labels` the negative control):
+
+| split | additive | ridge_embedding | low_rank_linear | shuffled | oracle |
+|---|---|---|---|---|---|
+| unseen_single | n/a | 0.30 [0.12, 0.47] | 0.30 | -0.03 | 0.99 |
+| unseen_combo_seen_genes | **0.84** [0.77, 0.90] | 0.67 | 0.67 | 0.24 | 1.00 |
+| unseen_combo_unseen_genes | n/a | 0.16 [-0.02, 0.35] | 0.16 | -0.09 | 1.00 |
+| unseen_context | 0.74 [0.66, 0.80] | 0.73 | 0.72 | 0.21 | 1.00 |
+
+Early observations, all provisional (one seed, one network):
+- `additive` beats both learned linear models on unseen combinations. Relevant to H1.
+- Transfer to a held-out *gene* is weak but real (0.30, CI excludes 0) and transfer to an
+  unseen *pair of unseen genes* is not yet distinguishable from zero.
+- `shuffled_labels` reaches 0.24 on the combination split: a fifth of the Pearson-delta
+  signal there does not require knowing which perturbation was applied. Under the earlier
+  module-free simulator it reached **0.57**. This is direct support for the H1 framing that
+  Pearson-delta flatters models, and it is why the control is reported in every table.
+- `oracle_latent` is ~0.99 everywhere, so the 32-d latent bottleneck is not the binding
+  constraint and does not explain any model's failure.
+- `control_mean` yields an undefined Pearson-delta (a constant prediction has no variance);
+  it is reported as n/a with the MSE columns ranking it, not silently dropped.
+- `ridge_embedding` and `low_rank_linear` agree to ~3 decimals, so the rank-8 truncation is
+  not binding at this feature count. Needs either a lower rank or an honest note that the
+  two coincide here.
+
+**Open questions**
+- Gene-holdout splits are small (3 test genes at 12 regulators). The full profile's 20
+  regulators and multiple seeds should fix the perturbation-level sample size.
+- The low-rank baseline is described as "in the spirit of" the 2025 benchmark paper's
+  model, not a reproduction, and the citation is `TODO[verify]`.

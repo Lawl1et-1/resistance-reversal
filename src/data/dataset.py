@@ -27,6 +27,7 @@ from src.simulator.grn import (
     enumerate_perturbation_sets,
     make_context_offsets,
     observe,
+    sample_cell_bias,
     seed_state,
     simulate,
     true_sensitivity,
@@ -164,7 +165,7 @@ def make_response_data(
         for pert in all_perts:
             n = n_control_cells if pert == CONTROL else n_cells
             x0 = seed_state(ctx, phenotype, n, rng)
-            state = simulate(ctx, x0, pert, rng=rng)
+            state = simulate(ctx, x0, pert, rng=rng, cell_bias=sample_cell_bias(ctx, n, rng))
             X.append(observe(ctx, state, rng, batch=batch))
             latent.append(state)
             pids.append(np.full(n, pert_index[pert]))
@@ -211,7 +212,12 @@ def make_sensitivity_data(
     for ctx_id, offset in enumerate(offsets):
         ctx = with_context(grn, offset)
         for label, phenotype in ((1, "sensitive"), (0, "resistant")):
-            state = simulate(ctx, seed_state(ctx, phenotype, n_cells, rng), rng=rng)
+            state = simulate(
+                ctx,
+                seed_state(ctx, phenotype, n_cells, rng),
+                rng=rng,
+                cell_bias=sample_cell_bias(ctx, n_cells, rng),
+            )
             X.append(observe(ctx, state, rng, batch=batch_shift))
             y.append(np.full(n_cells, label))
             cids.append(np.full(n_cells, ctx_id))
