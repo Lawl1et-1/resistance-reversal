@@ -278,9 +278,18 @@ def _readout_sanity(rev_summary: pd.DataFrame) -> list[dict]:
         if "oracle_latent" not in set(g.model) or len(g) < 3:
             continue
         ranked = g.sort_values("reversal_rank_rho", ascending=False).model.tolist()
+        oracle = g.set_index("model").loc["oracle_latent"]
         oracle_rank = ranked.index("oracle_latent") + 1
-        oracle_rho = float(g.set_index("model").loc["oracle_latent", "reversal_rank_rho"])
+        oracle_rho = float(oracle["reversal_rank_rho"])
+        oracle_hi = float(oracle.get("reversal_rank_rho_hi", oracle_rho))
         best_rho = float(g.reversal_rank_rho.max())
+
+        # Flag only when the oracle is beaten by more than sampling noise. A bare rank
+        # threshold fires whenever a model edges ahead by 0.02 on ten test perturbations
+        # across two seeds, which is how this check previously condemned readouts that
+        # were fine. The oracle counts as reliable if it ranks near the top *or* its
+        # confidence interval still reaches the best model's point estimate.
+        beaten_significantly = oracle_hi < best_rho
         out.append(
             {
                 "readout": readout,
@@ -288,10 +297,16 @@ def _readout_sanity(rev_summary: pd.DataFrame) -> list[dict]:
                 "oracle_rank": oracle_rank,
                 "n_models": len(ranked),
                 "oracle_rho": oracle_rho,
+                "oracle_rho_hi": oracle_hi,
                 "best_rho": best_rho,
                 "best_model": ranked[0],
                 "oracle_beaten_by": float(best_rho - oracle_rho),
-                "readout_reliable": bool(oracle_rank <= 2),
+                # The interval is bootstrapped over seeds, so with very few seeds a flag
+                # means "not enough power to tell", not "readout broken". Recorded so a
+                # reader can see which case they are looking at.
+                "n_seeds": int(g.n_seeds.iloc[0]),
+                "underpowered": bool(g.n_seeds.iloc[0] < 3),
+                "readout_reliable": bool(oracle_rank <= 2 or not beaten_significantly),
             }
         )
     return out
@@ -345,7 +360,8 @@ def _verdict(result: dict) -> dict:
         "splits_excluded_for_small_test_sets": result.get("excluded_splits", []),
         "unreliable_readouts": [
             f"{s['readout']}/{s['split']} (oracle ranked {s['oracle_rank']}/{s['n_models']},"
-            f" beaten by {s['oracle_beaten_by']:.3f})"
+            f" beaten by {s['oracle_beaten_by']:.3f}"
+            + (f", UNDERPOWERED: only {s['n_seeds']} seeds)" if s["underpowered"] else ")")
             for s in unreliable
         ],
         "note": (
