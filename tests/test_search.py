@@ -172,6 +172,43 @@ def test_scores_are_cached_so_evaluations_are_not_repeated():
     assert obj.n_evaluations == len(obj.cache_)
 
 
+def test_shared_cache_does_not_leak_a_stale_penalty():
+    """A lambda view reuses the cache but must recombine the penalty at its own lambda."""
+    uncertainties = {g: 1.0 for g in range(6)}
+    base = make_objective(EFFECTS, uncertainties, lam=0.0)
+    pert = ((0, -1),)
+    first = base.score(pert)
+    view = base.with_penalty(lam=0.5)
+    second = view.score(pert)
+
+    assert view.cache_ is base.cache_, "the cache must be shared"
+    assert base.n_evaluations == 1, "the model must not be re-evaluated for a new lambda"
+    # Same underlying quantities, different penalty.
+    assert second["reversal"] == pytest.approx(first["reversal"])
+    assert second["uncertainty"] == pytest.approx(first["uncertainty"])
+    assert second["penalised"] == pytest.approx(first["reversal"] - 0.5 * first["uncertainty"])
+    assert second["penalised"] != pytest.approx(first["penalised"])
+    # The original must be unaffected by the view.
+    assert base.score(pert)["penalised"] == pytest.approx(first["penalised"])
+
+
+def test_shared_cache_applies_each_views_abstention_rule():
+    base = make_objective(EFFECTS, {0: 9.0}, lam=0.0)
+    pert = ((0, -1),)
+    assert base.score(pert)["abstain"] is False
+    strict = base.with_penalty(lam=0.0, abstain_above=1.0)
+    assert strict.score(pert)["abstain"] is True
+    assert base.score(pert)["abstain"] is False, "the view must not mutate the original"
+
+
+def test_lambda_sweep_costs_one_evaluation_per_set():
+    base = make_objective(EFFECTS, {g: 1.0 for g in range(6)}, lam=0.0)
+    for lam in (0.0, 0.5, 1.0, 2.0):
+        view = base if lam == 0.0 else base.with_penalty(lam)
+        exhaustive(view, ATOMS, k=2)
+    assert base.n_evaluations == len(base.cache_)
+
+
 def test_point_predictor_preserves_population_spread():
     """A deterministic model must shift the population, not collapse it to a point."""
     obj = make_objective(EFFECTS)

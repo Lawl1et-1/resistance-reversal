@@ -228,6 +228,12 @@ def _summarise(df: pd.DataFrame, alpha: float) -> list[dict]:
             "exchangeability_violated": bool(shifted),
             "n_seeds": len(g),
             "nominal_coverage": 1.0 - alpha,
+            # A split whose calibration set is too small to certify the level gets an
+            # infinite interval, which trivially covers everything. Counting that as
+            # coverage reached would turn the method's own refusal to answer into a
+            # success, so certifiability is carried through to the verdict.
+            "certifiable": bool(g.shift_certifiable.all()) if "shift_certifiable" in g else True,
+            "median_n_cal": float(g.n_cal.median()),
         }
         for col in ("shift_coverage", "reversal_coverage", "uncertainty_auroc",
                     "risk_coverage_auc", "risk_coverage_auc_random", "reversal_bias",
@@ -241,7 +247,11 @@ def _summarise(df: pd.DataFrame, alpha: float) -> list[dict]:
 
 def _verdict(summary: list[dict], alpha: float) -> dict:
     """H2 is judged only on splits where the conformal assumption actually holds."""
-    valid = [s for s in summary if not s["exchangeability_violated"]]
+    exchangeable = [s for s in summary if not s["exchangeability_violated"]]
+    # Vacuous (infinite-interval) splits are excluded: they cover everything by refusing
+    # to commit, which is honest behaviour but is not evidence that calibration works.
+    valid = [s for s in exchangeable if s.get("certifiable", True)]
+    vacuous = [s for s in exchangeable if not s.get("certifiable", True)]
     shifted = [s for s in summary if s["exchangeability_violated"]]
     target = 1.0 - alpha
     # Coverage counts as reached if the bootstrap CI reaches the nominal level; conformal
@@ -268,10 +278,17 @@ def _verdict(summary: list[dict], alpha: float) -> dict:
         "shifted_split_coverage": {
             s["split"]: s.get("shift_coverage") for s in shifted
         },
+        "vacuous_splits": [
+            f"{s['split']} (median n_cal={s['median_n_cal']:.0f}, interval infinite)"
+            for s in vacuous
+        ],
         "note": (
             "H2 is evaluated only where calibration and test perturbations are "
-            "exchangeable. The unseen-context split violates that by construction and its "
-            "coverage is reported separately, not counted toward the verdict."
+            "exchangeable AND the calibration set is large enough to certify the level. "
+            "The unseen-context split violates exchangeability by construction and its "
+            "coverage is reported separately. Splits listed under vacuous_splits return "
+            "infinite intervals, so their coverage of 1.0 reflects the method declining to "
+            "commit rather than calibration succeeding, and they are excluded."
         ),
     }
 
@@ -292,6 +309,8 @@ def main() -> None:
           f" ({v['n_splits_where_abstention_lowers_error']}/{v['n_valid_splits']})")
     print(f"  uncertainty beats random ordering: "
           f"{v['n_splits_uncertainty_beats_random_ordering']}/{v['n_valid_splits']}")
+    for line in v["vacuous_splits"]:
+        print(f"  excluded as vacuous: {line}")
     for split_name, cov in v["shifted_split_coverage"].items():
         print(f"  under context shift ({split_name}): coverage "
               f"{cov if cov is None else f'{cov:.3f}'} (guarantee does not apply)")

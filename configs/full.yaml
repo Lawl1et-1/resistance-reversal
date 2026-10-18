@@ -23,13 +23,21 @@ encoder:
   latent_dim: 32
   n_hvg: null
 
+# Sized against the measured cost/quality curve rather than by picking large numbers.
+# Per-member fit time (measured): 3 000 steps @ hidden 128 = 85 s; 12 000 @ 128 = 216 s;
+# 12 000 @ 256 (batch 512) = 619 s. The experiments fit 65 ensembles in total, so
+# 8 000 steps @ hidden 256 would have taken roughly 37 hours of CPU. Held-out direction
+# quality over that range moves from cosine 0.78 to 0.90 while held-out magnitude is flat
+# at ~0.6x, so most of the extra compute buys very little. At 4 000 steps @ hidden 128 the
+# full set of experiments is about 10 hours, which is what this machine can actually do
+# without a GPU. Recorded here so the choice is visible rather than silently tuned.
 pertflow:
-  steps: 8000
-  hidden: 256
+  steps: 4000
+  hidden: 128
   set_dim: 32
   n_ensemble: 5
   lr: 0.003
-  batch_size: 512
+  batch_size: 256
   n_flow_steps: 20
   n_eval_cells: 128
 

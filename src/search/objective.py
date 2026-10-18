@@ -64,33 +64,64 @@ class ReversalObjective:
         return float(fn(pert, self.context)) if fn is not None else 0.0
 
     def score(self, pert: tuple) -> dict:
-        key = tuple(sorted(pert))
-        if key in self.cache_:
-            return self.cache_[key]
-        self.n_evaluations += 1
+        """Score a set. Only the lambda-independent parts are cached.
 
-        z_pred = self.predict_population(pert)
-        s_pred = float(np.mean(self.sensitivity(z_pred)))
-        u = self.uncertainty(pert)
-        out = {
-            "pert": key,
-            "size": len(key),
-            "s_pred": s_pred,
-            "s_baseline": self.baseline_s_,
-            "reversal": s_pred - self.baseline_s_,
-            "uncertainty": u,
-            "penalised": (s_pred - self.baseline_s_) - self.lam * u,
-            "abstain": bool(self.abstain_above is not None and u > self.abstain_above),
-        }
-        if self.sensitive_reference is not None:
-            out["energy_to_sensitive"] = energy_distance(z_pred, self.sensitive_reference)
-        self.cache_[key] = out
+        `penalised` and `abstain` are recombined on every call rather than stored, so a
+        cache shared across lambdas (see `with_penalty`) can never hand back a penalty
+        computed at a different lambda.
+        """
+        key = tuple(sorted(pert))
+        base = self.cache_.get(key)
+        if base is None:
+            self.n_evaluations += 1
+            z_pred = self.predict_population(pert)
+            s_pred = float(np.mean(self.sensitivity(z_pred)))
+            base = {
+                "pert": key,
+                "size": len(key),
+                "s_pred": s_pred,
+                "s_baseline": self.baseline_s_,
+                "reversal": s_pred - self.baseline_s_,
+                "uncertainty": self.uncertainty(pert),
+            }
+            if self.sensitive_reference is not None:
+                base["energy_to_sensitive"] = energy_distance(z_pred, self.sensitive_reference)
+            self.cache_[key] = base
+
+        out = dict(base)
+        u = out["uncertainty"]
+        out["lambda"] = self.lam
+        out["penalised"] = out["reversal"] - self.lam * u
+        out["abstain"] = bool(self.abstain_above is not None and u > self.abstain_above)
         return out
 
     def objective(self, pert: tuple) -> float:
         """What the search maximises. An abstained set is never selectable."""
         rec = self.score(pert)
         return -np.inf if rec["abstain"] else rec["penalised"]
+
+    def with_penalty(self, lam: float, abstain_above: float | None = None) -> "ReversalObjective":
+        """A view at a different lambda that **shares this objective's score cache**.
+
+        Reversal and uncertainty do not depend on lambda -- only the penalty combining them
+        does -- so re-scoring every candidate set for each lambda repeats the expensive part
+        (an ODE integration per ensemble member over a cell population) for nothing. Sharing
+        the cache makes a lambda sweep cost one search instead of one per value.
+        """
+        clone = ReversalObjective(
+            model=self.model,
+            sensitivity=self.sensitivity,
+            encoder=self.encoder,
+            z0=self.z0,
+            context=self.context,
+            lam=lam,
+            n_samples=self.n_samples,
+            sensitive_reference=self.sensitive_reference,
+            abstain_above=abstain_above,
+        )
+        clone.cache_ = self.cache_
+        clone.baseline_s_ = self.baseline_s_
+        return clone
 
     def score_many(self, perts: list[tuple]) -> list[dict]:
         return [self.score(p) for p in perts]
