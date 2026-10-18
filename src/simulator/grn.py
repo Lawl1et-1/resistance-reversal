@@ -134,6 +134,40 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-np.clip(x, -40, 40)))
 
 
+def with_context(grn: GRN, b_offset: np.ndarray) -> GRN:
+    """A cell context: same regulatory wiring, shifted basal expression.
+
+    This is the stand-in for a different cell line -- the biology (`W`) is shared, the
+    basal state is not -- and it is what the unseen-context split holds out.
+    """
+    return GRN(
+        cfg=grn.cfg,
+        W=grn.W,
+        b=grn.b + b_offset,
+        regulators=grn.regulators,
+        reg_effect=grn.reg_effect,
+        program_sensitive=grn.program_sensitive,
+        program_resistance=grn.program_resistance,
+    )
+
+
+def make_context_offsets(
+    grn: GRN, n_contexts: int, strength: float, rng: np.random.Generator
+) -> list[np.ndarray]:
+    """Basal-expression offsets, one per context. Context 0 is the reference (no shift).
+
+    The masters are shifted only weakly: a large offset on the switch itself would move
+    contexts into different attractors outright, which is a different experiment than
+    the one we mean to run.
+    """
+    offsets = [np.zeros(grn.n_genes)]
+    for _ in range(n_contexts - 1):
+        off = rng.normal(0.0, strength, size=grn.n_genes)
+        off[[SENSITIVE, RESISTANCE]] *= 0.25
+        offsets.append(off)
+    return offsets
+
+
 def pert_vector(grn: GRN, pert: tuple[tuple[int, int], ...]) -> np.ndarray:
     """Additive input for a perturbation set. Each item is (gene_index, direction)."""
     u = np.zeros(grn.n_genes)
