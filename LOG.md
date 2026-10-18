@@ -228,6 +228,31 @@ A separate capacity sweep was abandoned after it consumed ~55 minutes of CPU for
 largest configurations while starving the other experiments; the full profile already runs
 at 8 000 steps / hidden 256, so it answers the same question as a by-product.
 
+## M5 - search, and a diagnostic that condemned the wrong thing
+
+**Failure 11: the readout diagnostic was broken, not the readouts.** The H1 run added a
+check comparing each model's intervention ranking against `oracle_latent`, on the reasoning
+that an oracle reproducing the observed delta should rank interventions at least as well as
+any model, so a model beating it indicts the sensitivity readout. The check fired on
+*both* readouts at once (oracle ranked 6th of 7 under each), and that universality was the
+tell: a diagnostic that condemns everything is usually itself at fault.
+
+The oracle exposed only `predict_latent_delta`, so the search objective fell back to
+`z0 + delta` for its predicted population -- the control cells shifted by a constant. An
+additive shift cannot represent a population moving into a *different attractor*, which is
+precisely what reversal is: the real perturbed population lands in the sensitive basin, it
+does not sit where the control population sat plus an offset. So the oracle was handicapped
+against any model with a real population sampler, and scored worse for reasons that had
+nothing to do with the readouts.
+
+`OracleLatent` now implements `sample_latent`, returning the observed post-perturbation
+cells. It is then a genuine upper bound, and the diagnostic means what it claims.
+
+The earlier reading -- "both sensitivity readouts are unreliable" -- is **withdrawn**. The
+real, separately-evidenced readout problem is still the one in M4 below: the latent
+classifier barely registers a true reversal (0.11 to 0.23) while the signature readout
+tracks it (0.21 to 0.95). That evidence does not depend on the oracle and stands.
+
 ## M4 - conformal calibration, sensitivity functional
 
 Split conformal with the normalised score `|y - yhat| / spread` is implemented with the
