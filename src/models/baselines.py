@@ -70,8 +70,15 @@ def gene_embeddings(
     u, s, _ = np.linalg.svd(corr, full_matrices=False)
     d = min(dim, u.shape[1])
     emb = u[:, :d] * s[:d]
-    scale = np.abs(emb).max()
-    return emb / scale if scale > 0 else emb
+
+    # Standardise per dimension. Dividing by a global maximum (the obvious thing) leaves
+    # the trailing dimensions at ~0.05 scale while the latent state the conditioning is
+    # concatenated with has scale ~0.85, a ~18x mismatch: the network then ignores the
+    # perturbation identity and predicts one average shift for every perturbation, and a
+    # fixed-alpha ridge shrinks the embedding coefficients almost to zero. Per-dimension
+    # standardisation puts conditioning and state on the same footing.
+    sd_emb = emb.std(axis=0)
+    return (emb - emb.mean(axis=0)) / np.where(sd_emb > 1e-8, sd_emb, 1.0)
 
 
 def set_features(

@@ -17,8 +17,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
 from src.data.dataset import CONTROL, PerturbData
 from src.data.splits import Split
@@ -34,7 +32,14 @@ def training_cell_mask(data: PerturbData, split: Split) -> np.ndarray:
 
 @dataclass
 class LatentEncoder:
-    """HVG selection -> standardisation -> PCA. Linear, so the decoder is exact."""
+    """HVG selection -> standardisation -> PCA. Linear, so the decoder is exact.
+
+    Implemented directly on numpy's SVD rather than scikit-learn. Two reasons: PCA and
+    standardisation are a handful of lines here and the delta helpers below already depend
+    on the transform being exactly linear, and importing scikit-learn alongside torch
+    segfaults under pytest in this environment (see LOG.md Failure 8), which would have
+    meant no test coverage for any model that uses both.
+    """
 
     latent_dim: int = 32
     n_hvg: int | None = None
@@ -48,33 +53,46 @@ class LatentEncoder:
             # Highly variable genes by raw variance on the training cells only.
             self.gene_index = np.sort(np.argsort(-X.var(axis=0))[: self.n_hvg])
         Xh = X[:, self.gene_index]
-        self.scaler_ = StandardScaler().fit(Xh)
+
+        # Standardise. Genes with no variance would divide by zero; they carry no signal,
+        # so their scale is pinned to 1 and they end up contributing nothing.
+        self.mean_ = Xh.mean(axis=0)
+        sd = Xh.std(axis=0)
+        self.scale_ = np.where(sd > 1e-8, sd, 1.0)
+        Xs = (Xh - self.mean_) / self.scale_
+
         dim = min(self.latent_dim, Xh.shape[1], len(Xh))
-        self.pca_ = PCA(n_components=dim, random_state=self.seed).fit(self.scaler_.transform(Xh))
+        self.pca_mean_ = Xs.mean(axis=0)  # ~0 by construction; kept for exactness
+        _, s, vt = np.linalg.svd(Xs - self.pca_mean_, full_matrices=False)
+        self.components_ = vt[:dim]
+        var = s**2
+        self.explained_ = float(var[:dim].sum() / var.sum()) if var.sum() > 0 else 0.0
         self.latent_dim_fitted_ = dim
         return self
 
     # --- state <-> latent ---------------------------------------------------------------
 
     def transform(self, X: np.ndarray) -> np.ndarray:
-        return self.pca_.transform(self.scaler_.transform(np.atleast_2d(X)[:, self.gene_index]))
+        Xs = (np.atleast_2d(X)[:, self.gene_index] - self.mean_) / self.scale_
+        return (Xs - self.pca_mean_) @ self.components_.T
 
     def inverse_transform(self, Z: np.ndarray) -> np.ndarray:
-        """Back to (standardised-then-inverted) HVG expression space."""
-        return self.scaler_.inverse_transform(self.pca_.inverse_transform(np.atleast_2d(Z)))
+        """Back to HVG expression space."""
+        Xs = np.atleast_2d(Z) @ self.components_ + self.pca_mean_
+        return Xs * self.scale_ + self.mean_
 
     # --- deltas ------------------------------------------------------------------------
-    # A delta is a difference of states, so the scaler's *offset* cancels and only its
-    # scale applies. Using inverse_transform on a delta directly would wrongly add the
-    # mean back in, which is a silent and large error, hence these two helpers.
+    # A delta is a difference of states, so every offset (the gene mean and the PCA mean)
+    # cancels and only the scale applies. Passing a delta through inverse_transform would
+    # wrongly add those offsets back in -- a silent and large error -- hence these helpers.
 
     def decode_delta(self, dZ: np.ndarray) -> np.ndarray:
         """Latent delta -> gene-space delta over `gene_index`."""
-        return np.atleast_2d(dZ) @ self.pca_.components_ * self.scaler_.scale_
+        return np.atleast_2d(dZ) @ self.components_ * self.scale_
 
     def encode_delta(self, dX: np.ndarray) -> np.ndarray:
         """Gene-space delta over `gene_index` -> latent delta."""
-        return (np.atleast_2d(dX) / self.scaler_.scale_) @ self.pca_.components_.T
+        return (np.atleast_2d(dX) / self.scale_) @ self.components_.T
 
     def genes(self, X: np.ndarray) -> np.ndarray:
         """Restrict a gene-space array to the HVG subset the encoder was fitted on."""
@@ -82,7 +100,7 @@ class LatentEncoder:
 
     @property
     def explained_variance(self) -> float:
-        return float(self.pca_.explained_variance_ratio_.sum())
+        return self.explained_
 
 
 def fit_encoder(

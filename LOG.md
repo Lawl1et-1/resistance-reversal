@@ -137,3 +137,73 @@ Early observations, all provisional (one seed, one network):
   regulators and multiple seeds should fix the perturbation-level sample size.
 - The low-rank baseline is described as "in the spirit of" the 2025 benchmark paper's
   model, not a reproduction, and the citation is `TODO[verify]`.
+
+## M3 - PertFlow and deep ensemble
+
+**Failure 6: conditioning the flow on `z0` destroyed the predicted distribution.** The
+project brief writes the velocity field as `v_theta(z_t, t | z0, S)`, and I implemented that
+literally. It is wrong under independent coupling. For a given `z0` the training target is
+the *whole* perturbed marginal, so the network can only learn `E[z1 - z0 | z_t, z0, S]`, and
+integrating a deterministic ODE from a single starting point runs it to that conditional
+mean. A point cannot spread into a distribution. Measured consequence:
+
+| | per-dimension std | energy distance to truth |
+|---|---|---|
+| control cells (no prediction) | 0.854 | 0.871 |
+| observed perturbed cells | 0.858 | - |
+| PertFlow, z0-conditioned | **0.300** | **2.914** (worse than predicting nothing) |
+| PertFlow, marginal field | 0.930 | 0.703 |
+
+Standard conditional flow matching uses the marginal field `v(z_t, t | S, context)`, which
+provably transports the control marginal to the perturbed marginal; per-cell structure is
+carried by the ODE's starting point, not by conditioning. Implemented that way, the
+distribution is recovered and the energy distance finally beats the do-nothing control. The
+notation in the brief describes the conditional *path construction*, not the network's
+inputs, and the paper should say so explicitly since it is an easy mistake to repeat.
+
+**Failure 7 (affected the baselines too): the gene embeddings were ~18x too small.**
+After fixing the flow, predicted mean shifts were still only ~40% of the true magnitude --
+and crucially they undershot on *training* perturbations too, and 10x more training did not
+help, so it was neither underfitting nor a generalisation gap. Isolating the model on a
+single perturbation gave near-perfect transport (predicted shift norm 3.33 vs true 3.16,
+cosine 0.997), which located the fault in the conditioning pathway rather than the flow.
+
+The cause: `gene_embeddings` normalised by a global maximum, leaving per-dimension spread at
+**0.0485** while the latent state concatenated alongside it has spread **0.854**. The
+network could minimise its loss by ignoring perturbation identity and emitting one average
+shift for every perturbation. Evidence: spread of predicted shifts across perturbations was
+**0.066** against a true value of 0.306, with predicted norms sitting in a narrow 0.65-1.11
+band while true norms ranged 1.7-3.8.
+
+The same bug silently handicapped `ridge_embedding` and `low_rank_linear`, because ridge at
+a fixed `alpha` is not scale-invariant and near-zero features get shrunk almost to nothing.
+Both baselines' numbers in the M2 table above are therefore pessimistic and are superseded.
+
+Fix: standardise the embedding per dimension. After it, embedding spread is 1.015,
+cross-perturbation spread of predictions rises to 0.214 (true 0.306) and the mean cosine to
+the true shift is 0.842 -- the direction is now broadly right.
+
+**Failure 8: scikit-learn plus torch segfaults under pytest on this machine.** Adding the
+PertFlow tests crashed the interpreter (exit 139) on even the lightest test, including one
+that only touched the set encoder. Isolating it: `torch` with `sklearn.decomposition` or
+`sklearn.preprocessing` segfaults *under pytest* while both import fine in plain Python, and
+`scipy.stats`, `scipy.spatial.distance` and `pandas` are all unaffected. It is the duplicate
+OpenMP runtime interacting with pytest's assertion-rewriting import hook;
+`KMP_DUPLICATE_LIB_OK=TRUE` and `OMP_NUM_THREADS=1` made no difference.
+
+Left alone this would have meant no test coverage at all for any model that touches both
+libraries, i.e. the entire proposed method. scikit-learn was used for exactly two things,
+`PCA` and `StandardScaler`, both a few lines of numpy, and the encoder's delta helpers
+already depend on the transform being exactly linear. Reimplemented on `np.linalg.svd`:
+the dependency is dropped from `requirements.txt`, the suite runs clean (94 tests), and the
+encoder's identities are now pinned by tests
+(`encode_delta(x1 - x2) == transform(x1) - transform(x2)` and its decode counterpart, plus
+a test asserting that passing a delta through `inverse_transform` is wrong, which is the
+trap those helpers exist to prevent).
+
+**Still open: magnitude shrinkage.** Predicted shift norms remain ~55-60% of the truth. Some
+shrinkage is the correct behaviour of a conditional-mean estimator under uncertainty, but
+this much will bias every reversal score downward, so a capacity/training sweep is running
+before any of H2-H3 is evaluated. A model that systematically understates the effect of
+every intervention would make the uncertainty-penalised search look better or worse than it
+deserves for reasons unrelated to uncertainty.
