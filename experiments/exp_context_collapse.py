@@ -26,13 +26,21 @@ import argparse
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from experiments.common import RESULTS, build, load_config, write_json, write_table
 from src.eval.evaluate import evaluate_point
 from src.models.baselines import RidgeEmbedding
 
-SPLIT = "unseen_context"
+# The shifted split and a control split whose test contexts were all seen in training.
+# Without the control, a monotone decline with integration steps proves nothing about
+# shift: a flow that simply integrates badly would show the same curve everywhere. The
+# claim is only about shift if the control stays flat (or improves) while the shifted
+# split degrades.
+SHIFTED_SPLIT = "unseen_context"
+CONTROL_SPLIT = "unseen_combo_seen_genes"
+SPLITS = (SHIFTED_SPLIT, CONTROL_SPLIT)
 FLOW_STEPS = (1, 2, 5, 10, 20)
 
 
@@ -44,40 +52,48 @@ def run(cfg: dict, seeds: list[int], train_steps: list[int], out_dir: Path) -> d
     for seed in seeds:
         print(f"[ctx] seed {seed}")
         setup = build(cfg, seed)
-        split = setup.splits[SPLIT]
-        encoder = setup.encoders[SPLIT]
-
-        ridge = RidgeEmbedding().fit(setup.data, split, encoder)
-        rows.append(
-            {"seed": seed, "model": "ridge_embedding", "train_steps": None, "flow_steps": None,
-             "pearson_delta": evaluate_point(ridge, setup.data, split, encoder).pearson_delta.mean()}
-        )
-
         common = dict(hidden=pf["hidden"], set_dim=pf["set_dim"], n_ensemble=pf["n_ensemble"],
                       lr=pf["lr"], batch_size=pf["batch_size"], n_eval_cells=pf["n_eval_cells"],
                       seed=seed)
-        mlp = PertFlow(name="pertflow_mlp", mode="mlp", steps=train_steps[0], **common)
-        mlp.fit(setup.data, split, encoder)
-        rows.append(
-            {"seed": seed, "model": "pertflow_mlp", "train_steps": train_steps[0],
-             "flow_steps": None,
-             "pearson_delta": evaluate_point(mlp, setup.data, split, encoder).pearson_delta.mean()}
-        )
 
-        for steps in train_steps:
-            t0 = time.time()
-            model = PertFlow(steps=steps, n_flow_steps=max(FLOW_STEPS), **common)
-            model.fit(setup.data, split, encoder)
-            print(f"  fitted flow @ {steps} steps in {time.time()-t0:.0f}s")
-            # Same fitted weights, different integration budget at inference.
-            for n in FLOW_STEPS:
-                model.n_flow_steps = n
-                df = evaluate_point(model, setup.data, split, encoder)
-                rows.append(
-                    {"seed": seed, "model": "pertflow", "train_steps": steps, "flow_steps": n,
-                     "pearson_delta": df.pearson_delta.mean()}
-                )
-                print(f"    flow_steps={n:3d}  pearson_delta={df.pearson_delta.mean():.3f}")
+        for split_name in SPLITS:
+            if split_name not in setup.splits:
+                print(f"  {split_name}: unavailable, skipped")
+                continue
+            shifted = split_name == SHIFTED_SPLIT
+            split, encoder = setup.splits[split_name], setup.encoders[split_name]
+            print(f"  --- {split_name} ({'context shift' if shifted else 'control, no shift'}) ---")
+
+            ridge = RidgeEmbedding().fit(setup.data, split, encoder)
+            rows.append(
+                {"seed": seed, "split": split_name, "shifted": shifted,
+                 "model": "ridge_embedding", "train_steps": None, "flow_steps": None,
+                 "pearson_delta": evaluate_point(ridge, setup.data, split, encoder).pearson_delta.mean()}
+            )
+
+            mlp = PertFlow(name="pertflow_mlp", mode="mlp", steps=train_steps[0], **common)
+            mlp.fit(setup.data, split, encoder)
+            rows.append(
+                {"seed": seed, "split": split_name, "shifted": shifted,
+                 "model": "pertflow_mlp", "train_steps": train_steps[0], "flow_steps": None,
+                 "pearson_delta": evaluate_point(mlp, setup.data, split, encoder).pearson_delta.mean()}
+            )
+
+            for steps in train_steps:
+                t0 = time.time()
+                model = PertFlow(steps=steps, n_flow_steps=max(FLOW_STEPS), **common)
+                model.fit(setup.data, split, encoder)
+                print(f"    fitted flow @ {steps} steps in {time.time()-t0:.0f}s")
+                # Same fitted weights, different integration budget at inference.
+                for n in FLOW_STEPS:
+                    model.n_flow_steps = n
+                    df = evaluate_point(model, setup.data, split, encoder)
+                    rows.append(
+                        {"seed": seed, "split": split_name, "shifted": shifted,
+                         "model": "pertflow", "train_steps": steps, "flow_steps": n,
+                         "pearson_delta": df.pearson_delta.mean()}
+                    )
+                    print(f"      flow_steps={n:3d}  pearson_delta={df.pearson_delta.mean():.3f}")
 
     df = pd.DataFrame(rows)
     write_table(df, out_dir / "context_collapse_raw.csv")
@@ -87,46 +103,59 @@ def run(cfg: dict, seeds: list[int], train_steps: list[int], out_dir: Path) -> d
 
 
 def _verdict(df: pd.DataFrame) -> dict:
-    flow = df[df.model == "pertflow"]
-    ridge = float(df[df.model == "ridge_embedding"].pearson_delta.mean())
-    mlp = float(df[df.model == "pertflow_mlp"].pearson_delta.mean())
-    base_steps = int(flow.train_steps.min())
-    long_steps = int(flow.train_steps.max())
+    """Is the degradation specific to context shift, or generic to integration?
 
-    by_flow = flow[flow.train_steps == base_steps].groupby("flow_steps").pearson_delta.mean()
-    at_1 = float(by_flow.get(1, float("nan")))
-    at_max = float(by_flow.get(max(FLOW_STEPS), float("nan")))
-    by_train = flow[flow.flow_steps == max(FLOW_STEPS)].groupby("train_steps").pearson_delta.mean()
+    Deliberately does **not** name a cause. The original hypothesis was an untrained
+    context embedding, but that predicts longer training changes nothing, whereas longer
+    training measurably *hurts*. Something else is involved -- overfitting to the training
+    contexts, or the velocity field leaving the data manifold for inputs it never saw.
+    The claim supported by this design is the narrower one: error compounds over
+    integration under context shift.
+    """
+    per_split = {}
+    for split_name, g in df[df.model == "pertflow"].groupby("split"):
+        base_steps = int(g.train_steps.min())
+        long_steps = int(g.train_steps.max())
+        by_flow = g[g.train_steps == base_steps].groupby("flow_steps").pearson_delta.mean()
+        ordered = by_flow.sort_index()
+        at_1, at_max = float(ordered.iloc[0]), float(ordered.iloc[-1])
+        by_train = g[g.flow_steps == max(FLOW_STEPS)].groupby("train_steps").pearson_delta.mean()
+        ref = df[(df.split == split_name) & (df.model == "pertflow_mlp")].pearson_delta.mean()
+        per_split[split_name] = {
+            "shifted": bool(g.shifted.iloc[0]),
+            "pearson_delta_by_flow_steps": {int(k): float(v) for k, v in ordered.items()},
+            "degradation_1_to_max_steps": at_1 - at_max,
+            "monotone_decreasing": bool((ordered.diff().dropna() <= 1e-6).all()),
+            "mlp_reference": float(ref),
+            "ridge_reference": float(
+                df[(df.split == split_name) & (df.model == "ridge_embedding")].pearson_delta.mean()
+            ),
+            "at_longer_training": float(by_train.get(long_steps, float("nan"))),
+            "longer_training_helps": bool(by_train.get(long_steps, -np.inf) > at_max),
+        }
 
-    # (a) is supported if cutting the integration budget recovers most of the gap to the MLP.
-    recovered = (at_1 - at_max) / max(mlp - at_max, 1e-9)
-    longer = float(by_train.get(long_steps, float("nan")))
-    training_recovered = (longer - at_max) / max(mlp - at_max, 1e-9)
-
-    # The cleanest evidence for compounding is not the size of the recovery but its shape:
-    # accuracy should fall as the integration budget rises, because each step reapplies the
-    # same faulty conditioning. A ratio can exceed 100% when one step beats the regressor,
-    # so the monotone trend is reported alongside it.
-    ordered = by_flow.sort_index()
-    monotone = bool((ordered.diff().dropna() <= 1e-6).all()) if len(ordered) > 2 else False
-    return {
-        "pearson_delta_by_flow_steps": {int(k): float(v) for k, v in ordered.items()},
-        "monotone_decreasing_in_integration_steps": monotone,
-        "ridge": ridge,
-        "mlp_reference": mlp,
-        "flow_at_1_step": at_1,
-        "flow_at_max_steps": at_max,
-        f"flow_trained_{long_steps}_at_max_steps": longer,
-        "fraction_of_gap_recovered_by_fewer_integration_steps": recovered,
-        "fraction_of_gap_recovered_by_longer_training": training_recovered,
-        "compounding_supported": bool(recovered > 0.5 and monotone),
-        "undertraining_supported": bool(training_recovered > 0.5),
-        "note": (
-            "Gap is measured against the MLP ablation, which shares the architecture and "
-            "differs only in integrating an ODE. A fraction near 1 means that explanation "
-            "accounts for the collapse; near 0 means it does not."
-        ),
-    }
+    shifted = next((v for v in per_split.values() if v["shifted"]), None)
+    control = next((v for v in per_split.values() if not v["shifted"]), None)
+    out = {"per_split": per_split}
+    if shifted and control:
+        ds, dc = shifted["degradation_1_to_max_steps"], control["degradation_1_to_max_steps"]
+        out.update(
+            {
+                "degradation_shifted": ds,
+                "degradation_control": dc,
+                # Shift-specific only if the shifted split degrades materially and the
+                # control split does not degrade anywhere near as much.
+                "compounding_is_shift_specific": bool(ds > 0.05 and ds > 3 * max(dc, 0.0)),
+                "generic_integration_problem": bool(dc > 0.05 and ds <= 3 * max(dc, 0.0)),
+            }
+        )
+    out["note"] = (
+        "A monotone decline with integration steps on the shifted split alone supports "
+        "'error compounds over integration under context shift'. The same decline on the "
+        "unshifted control instead indicates a generic integration defect and says nothing "
+        "about shift. No causal mechanism is claimed either way."
+    )
+    return out
 
 
 def main() -> None:
@@ -145,18 +174,21 @@ def main() -> None:
     )
     out_dir = Path(args.out) if args.out else RESULTS / cfg["profile"]
     v = run(cfg, seeds, steps, out_dir)["verdict"]
-    print("\n--- unseen-context collapse ---")
-    print(f"  ridge baseline                     {v['ridge']:.3f}")
-    print(f"  MLP ablation (no integration)      {v['mlp_reference']:.3f}")
-    print(f"  flow, {max(FLOW_STEPS)} integration steps      {v['flow_at_max_steps']:.3f}")
-    print(f"  flow, 1 integration step           {v['flow_at_1_step']:.3f}")
-    trend = "  ".join(f"{k}:{val:.3f}" for k, val in v["pearson_delta_by_flow_steps"].items())
-    print(f"  by integration steps:              {trend}")
-    print(f"  monotone decreasing:               {v['monotone_decreasing_in_integration_steps']}")
-    print(f"  gap recovered by fewer steps:      {v['fraction_of_gap_recovered_by_fewer_integration_steps']:.1%}"
-          f"   -> compounding supported: {v['compounding_supported']}")
-    print(f"  gap recovered by longer training:  {v['fraction_of_gap_recovered_by_longer_training']:.1%}"
-          f"   -> undertraining supported: {v['undertraining_supported']}")
+    print("\n--- integration budget vs context shift ---")
+    for split_name, s in v["per_split"].items():
+        tag = "SHIFTED" if s["shifted"] else "control"
+        trend = "  ".join(f"{k}:{val:.3f}" for k, val in s["pearson_delta_by_flow_steps"].items())
+        print(f"  [{tag}] {split_name}")
+        print(f"      ridge={s['ridge_reference']:.3f}  mlp={s['mlp_reference']:.3f}")
+        print(f"      by integration steps: {trend}")
+        print(f"      degradation(1 -> max)={s['degradation_1_to_max_steps']:+.3f}"
+              f"  monotone={s['monotone_decreasing']}"
+              f"  longer training helps={s['longer_training_helps']}")
+    if "compounding_is_shift_specific" in v:
+        print(f"  shifted degradation {v['degradation_shifted']:+.3f} vs "
+              f"control {v['degradation_control']:+.3f}")
+        print(f"  compounding is SHIFT-SPECIFIC: {v['compounding_is_shift_specific']}")
+        print(f"  generic integration problem:   {v['generic_integration_problem']}")
     print(f"\nwrote {out_dir}")
 
 

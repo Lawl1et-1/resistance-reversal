@@ -43,7 +43,7 @@ def main() -> None:
     result = {
         "point_summary": summary.to_dict(orient="records"),
         "paired_tests": _paired(point),
-        "control_separation": _control_separation(summary),
+        "control_separation": _control_separation(point),
         "recomputed_from": "h1_point_metrics_raw.csv",
     }
 
@@ -66,12 +66,17 @@ def main() -> None:
     print(f"  paired comparisons:        {v['n_paired_comparisons']}")
     print(f"  deep significantly better: {v['deep_beats_linear_significantly']}")
     print(f"  deep significantly worse:  {v['linear_beats_deep_significantly']}")
-    print(f"  H1a (deep does not reliably win): {v['h1a_deep_fails_to_reliably_beat_linear']}")
+    print(f"  H1a: {v['h1a_verdict'].upper()} - {v['h1a_descriptive']}")
+    print(f"       pre-registered rule says 'fails to reliably beat' = {v['h1a_preregistered_rule']};"
+          f" revised rule says {v['h1a_revised_rule']}; rules agree = {v['h1a_rules_agree']}")
     print(f"  H1b (evaluation changes ranking): {v['h1b_evaluation_changes_ranking']}"
           f" ({v['n_ranking_winner_changes']}/{v['n_ranking_comparisons']} winner changes)")
     if v.get("splits_where_no_model_beats_shuffled_control"):
-        print("  NO MODEL BEATS THE SHUFFLED CONTROL on: "
+        print("  NO MODEL BEATS THE SHUFFLED CONTROL (adequately powered): "
               + ", ".join(v["splits_where_no_model_beats_shuffled_control"]))
+    if v.get("splits_inconclusive_against_control"):
+        print("  INCONCLUSIVE vs control (too few test perturbations): "
+              + ", ".join(v["splits_inconclusive_against_control"]))
     for line in v["unreliable_readouts"]:
         print(f"  UNRELIABLE READOUT: {line}")
     print(f"\nwrote {out_dir}")

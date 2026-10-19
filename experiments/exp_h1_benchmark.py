@@ -186,7 +186,7 @@ def run(cfg: dict, out_dir: Path) -> dict:
         "network_checks": checks,
         "point_summary": summary.to_dict(orient="records"),
         "paired_tests": _paired(point),
-        "control_separation": _control_separation(summary),
+        "control_separation": _control_separation(point),
     }
     if not reversal.empty:
         write_table(reversal, out_dir / "h1_reversal_raw.csv")
@@ -274,39 +274,64 @@ def _reversal_summary(reversal: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _control_separation(summary: pd.DataFrame) -> list[dict]:
-    """Can any model be told apart from the shuffled-label control on this split?
+# A split needs enough test perturbations before "no separation from the control" can mean
+# anything other than "too small to tell". Chosen as a judgement call after seeing the split
+# sizes, and logged as such in DECISIONS.md.
+MIN_PERTS_FOR_CONTROL_TEST = 20
 
-    The shuffled control is fitted with perturbation labels permuted, so its score is what
-    is obtainable *without* knowing which perturbation was applied. If a model's interval
-    overlaps the control's, that split provides no evidence the model learned anything
-    about perturbation identity -- whatever its point estimate looks like next to the other
-    models. This is the comparison the control was added for, and it is reported per split
-    rather than left for a reader to do by eye.
+
+def _control_separation(point: pd.DataFrame) -> list[dict]:
+    """Paired, seed-level comparison of each model against the shuffled-label control.
+
+    The control is fitted with perturbation labels permuted, so its score is what is
+    obtainable *without* knowing which perturbation was applied. Comparing it by whether
+    confidence intervals overlap is a crude and conservative test; the model and the control
+    are evaluated on the same seeds and the same perturbations, so the paired difference is
+    the right statistic and it has its own interval.
+
+    Failing to separate is reported as **inconclusive** on small splits rather than as
+    evidence that the models do no better than chance. With 5 or 10 test perturbations and
+    5 seeds there is very little power, and absence of evidence is not evidence of absence.
     """
     out = []
     excluded = {"shuffled_labels", "control_mean", "oracle_latent"}
-    for split_name, g in summary.groupby("split"):
-        ctrl = g[g.model == "shuffled_labels"]
-        if ctrl.empty or not np.isfinite(ctrl.pearson_delta.iloc[0]):
+    for split_name, g in point.groupby("split"):
+        ctrl = g[g.model == "shuffled_labels"].groupby("seed")["pearson_delta"].mean()
+        if ctrl.empty:
             continue
-        ctrl_hi = float(ctrl.pearson_delta_hi.iloc[0])
-        separated = []
-        for row in g.itertuples():
-            if row.model in excluded or not np.isfinite(row.pearson_delta):
+        # Per-seed test size, not the pooled count: different seeds hold out different
+        # genes, so pooling unique labels overstates how much a single run had to go on.
+        n_perts = int(g.groupby("seed")["pert"].nunique().median())
+        comparisons, separated = [], []
+        for model in sorted(set(g.model) - excluded):
+            a = g[g.model == model].groupby("seed")["pearson_delta"].mean()
+            shared = a.index.intersection(ctrl.index)
+            if len(shared) < 3:
                 continue
-            if float(row.pearson_delta_lo) > ctrl_hi:
-                separated.append(row.model)
-        models = [r.model for r in g.itertuples()
-                  if r.model not in excluded and np.isfinite(r.pearson_delta)]
+            res = paired_test(a.loc[shared].to_numpy(), ctrl.loc[shared].to_numpy())
+            if not np.isfinite(res.get("mean_diff", np.nan)):
+                continue
+            beats = bool(res["ci_lo"] > 0)
+            comparisons.append({"model": model, "beats_control": beats, **res})
+            if beats:
+                separated.append(model)
+
+        adequate = n_perts >= MIN_PERTS_FOR_CONTROL_TEST
+        if separated:
+            status = "at_least_one_model_beats_control"
+        elif adequate:
+            status = "no_separation_despite_adequate_size"
+        else:
+            status = "inconclusive_at_this_size"
         out.append(
             {
                 "split": split_name,
-                "control_pearson_delta": float(ctrl.pearson_delta.iloc[0]),
-                "control_ci_hi": ctrl_hi,
-                "n_models": len(models),
+                "n_test_perturbations": n_perts,
+                "adequately_powered": adequate,
+                "control_mean_pearson_delta": float(ctrl.mean()),
                 "models_separated_from_control": separated,
-                "any_model_beats_control": bool(separated),
+                "status": status,
+                "comparisons": comparisons,
             }
         )
     return out
@@ -424,11 +449,26 @@ def _verdict(result: dict) -> dict:
         "largest_deep_advantage": (
             max((r["mean_diff"] for r in paired), default=None)
         ),
-        # "Reliably beats" means wins decisively and does not decisively lose. Winning 4 of
-        # 20 comparisons while losing 3 -- including one where the deficit is six times the
-        # largest advantage -- is not reliability, so a bare win/loss count is not enough.
-        "h1a_deep_fails_to_reliably_beat_linear": not (
-            len(deep_wins) > 0 and len(deep_losses) == 0
+        # H1a is reported as INCONCLUSIVE and carries no binary verdict.
+        #
+        # The pre-registered rule and the revised rule disagree on this data, and neither
+        # is a good description of it: the original calls 4 wins against 3 losses
+        # "reliably beats", the revised one was written after seeing those counts. Picking
+        # either as the answer would be presenting a threshold choice as a result. The
+        # pre-registered rule is reported as the reference because it is the one that
+        # existed before the data, not because it describes the data better.
+        "h1a_verdict": "inconclusive",
+        "h1a_preregistered_rule": len(deep_wins) == 0 or len(deep_losses) >= len(deep_wins),
+        "h1a_revised_rule": not (len(deep_wins) > 0 and len(deep_losses) == 0),
+        "h1a_rules_agree": (
+            (len(deep_wins) == 0 or len(deep_losses) >= len(deep_wins))
+            == (not (len(deep_wins) > 0 and len(deep_losses) == 0))
+        ),
+        "h1a_descriptive": (
+            f"{len(deep_wins)} decisive wins and {len(deep_losses)} decisive losses over "
+            f"{len(paired)} paired comparisons; largest deep advantage "
+            f"{max((r['mean_diff'] for r in paired), default=float('nan')):+.3f}, largest "
+            f"deficit {min((r['mean_diff'] for r in paired), default=float('nan')):+.3f}"
         ),
         "n_ranking_comparisons": len(shifts),
         "n_ranking_winner_changes": len(disagreements),
@@ -436,7 +476,12 @@ def _verdict(result: dict) -> dict:
         "splits_excluded_for_small_test_sets": result.get("excluded_splits", []),
         "splits_where_no_model_beats_shuffled_control": [
             s["split"] for s in result.get("control_separation", [])
-            if not s["any_model_beats_control"]
+            if s["status"] == "no_separation_despite_adequate_size"
+        ],
+        "splits_inconclusive_against_control": [
+            f"{s['split']} (n={s['n_test_perturbations']})"
+            for s in result.get("control_separation", [])
+            if s["status"] == "inconclusive_at_this_size"
         ],
         "unreliable_readouts": [
             f"{s['readout']}/{s['split']} (oracle ranked {s['oracle_rank']}/{s['n_models']},"
@@ -471,7 +516,7 @@ def main() -> None:
     print(f"  paired comparisons:        {v['n_paired_comparisons']}")
     print(f"  deep significantly better: {v['deep_beats_linear_significantly']}")
     print(f"  deep significantly worse:  {v['linear_beats_deep_significantly']}")
-    print(f"  H1a (deep does not reliably win): {v['h1a_deep_fails_to_reliably_beat_linear']}")
+    print(f"  H1a: {v['h1a_verdict'].upper()} - {v['h1a_descriptive']}")
     print(f"  H1b (evaluation changes ranking): {v['h1b_evaluation_changes_ranking']}"
           f" ({v['n_ranking_winner_changes']}/{v['n_ranking_comparisons']} winner changes)")
     if v["splits_excluded_for_small_test_sets"]:

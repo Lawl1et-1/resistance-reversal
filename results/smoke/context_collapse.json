@@ -8,12 +8,14 @@
     "numpy": "2.2.4",
     "torch": "2.11.0+cu126",
     "cuda_available": false,
-    "git_commit": "54a0e06"
+    "git_commit": "297f2ec"
   },
   "result": {
     "per_run": [
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "ridge_embedding",
         "train_steps": NaN,
         "flow_steps": NaN,
@@ -21,6 +23,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow_mlp",
         "train_steps": 400.0,
         "flow_steps": NaN,
@@ -28,6 +32,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 400.0,
         "flow_steps": 1.0,
@@ -35,6 +41,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 400.0,
         "flow_steps": 2.0,
@@ -42,6 +50,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 400.0,
         "flow_steps": 5.0,
@@ -49,6 +59,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 400.0,
         "flow_steps": 10.0,
@@ -56,6 +68,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 400.0,
         "flow_steps": 20.0,
@@ -63,6 +77,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 1200.0,
         "flow_steps": 1.0,
@@ -70,6 +86,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 1200.0,
         "flow_steps": 2.0,
@@ -77,6 +95,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 1200.0,
         "flow_steps": 5.0,
@@ -84,6 +104,8 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 1200.0,
         "flow_steps": 10.0,
@@ -91,23 +113,162 @@
       },
       {
         "seed": 0,
+        "split": "unseen_context",
+        "shifted": true,
         "model": "pertflow",
         "train_steps": 1200.0,
         "flow_steps": 20.0,
         "pearson_delta": 0.5877014044057911
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "ridge_embedding",
+        "train_steps": NaN,
+        "flow_steps": NaN,
+        "pearson_delta": 0.8996258307701309
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow_mlp",
+        "train_steps": 400.0,
+        "flow_steps": NaN,
+        "pearson_delta": 0.8749779275978428
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 1.0,
+        "pearson_delta": 0.8666076605618788
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 2.0,
+        "pearson_delta": 0.8621853887853608
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 5.0,
+        "pearson_delta": 0.8628394640266377
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 10.0,
+        "pearson_delta": 0.86311886854677
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 20.0,
+        "pearson_delta": 0.8632734891609705
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 1.0,
+        "pearson_delta": 0.817288309364508
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 2.0,
+        "pearson_delta": 0.8814075961322564
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 5.0,
+        "pearson_delta": 0.8883667083296949
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 10.0,
+        "pearson_delta": 0.8867324677334825
+      },
+      {
+        "seed": 0,
+        "split": "unseen_combo_seen_genes",
+        "shifted": false,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 20.0,
+        "pearson_delta": 0.8862728063987362
       }
     ],
     "verdict": {
-      "ridge": 0.7294495915863106,
-      "mlp_reference": 0.6551732955944415,
-      "flow_at_1_step": 0.753776351512059,
-      "flow_at_max_steps": 0.5974345525236682,
-      "flow_trained_1200_at_max_steps": 0.5877014044057911,
-      "fraction_of_gap_recovered_by_fewer_integration_steps": 2.707745106206326,
-      "fraction_of_gap_recovered_by_longer_training": -0.1685722203191478,
-      "compounding_supported": true,
-      "undertraining_supported": false,
-      "note": "Gap is measured against the MLP ablation, which shares the architecture and differs only in integrating an ODE. A fraction near 1 means that explanation accounts for the collapse; near 0 means it does not."
+      "per_split": {
+        "unseen_combo_seen_genes": {
+          "shifted": false,
+          "pearson_delta_by_flow_steps": {
+            "1": 0.8666076605618788,
+            "2": 0.8621853887853608,
+            "5": 0.8628394640266377,
+            "10": 0.86311886854677,
+            "20": 0.8632734891609705
+          },
+          "degradation_1_to_max_steps": 0.0033341714009083034,
+          "monotone_decreasing": false,
+          "mlp_reference": 0.8749779275978428,
+          "ridge_reference": 0.8996258307701309,
+          "at_longer_training": 0.8862728063987362,
+          "longer_training_helps": true
+        },
+        "unseen_context": {
+          "shifted": true,
+          "pearson_delta_by_flow_steps": {
+            "1": 0.753776351512059,
+            "2": 0.720333670171592,
+            "5": 0.6455261086948227,
+            "10": 0.6139834035073537,
+            "20": 0.5974345525236682
+          },
+          "degradation_1_to_max_steps": 0.15634179898839085,
+          "monotone_decreasing": true,
+          "mlp_reference": 0.6551732955944415,
+          "ridge_reference": 0.7294495915863106,
+          "at_longer_training": 0.5877014044057911,
+          "longer_training_helps": false
+        }
+      },
+      "degradation_shifted": 0.15634179898839085,
+      "degradation_control": 0.0033341714009083034,
+      "compounding_is_shift_specific": true,
+      "generic_integration_problem": false,
+      "note": "A monotone decline with integration steps on the shifted split alone supports 'error compounds over integration under context shift'. The same decline on the unshifted control instead indicates a generic integration defect and says nothing about shift. No causal mechanism is claimed either way."
     }
   }
 }

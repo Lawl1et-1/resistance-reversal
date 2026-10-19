@@ -295,6 +295,15 @@ def _verdict(df: pd.DataFrame) -> dict:
             "n_lambdas_better_than_blind": len(helps),
             "n_lambdas_worse_than_blind": len(hurts),
             "h3_testable": not saturated,
+            # The optimism-gap scale bug and the saturation problem are independent, and
+            # only the first was fixed. Correcting the gap does not create headroom at
+            # lambda = 0, so it cannot revive H3; stated here so the fix is not misread as
+            # rescuing the hypothesis.
+            "scale_fix_does_not_restore_testability": bool(saturated),
+            "why_untestable": (
+                "lambda=0 already attains the oracle within 1%, so no penalty can improve "
+                "the recommendation regardless of how optimism is measured"
+            ) if saturated else None,
             "h3_penalty_improves_verified_reversal": (
                 None if saturated else (len(helps) > 0 and not hurts)
             ),

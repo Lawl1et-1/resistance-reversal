@@ -47,6 +47,8 @@ def main() -> None:
     if v.get("search_saturated_at_oracle"):
         print("  SEARCH SATURATED at lambda=0: no headroom for any penalty.")
         print("  H3 is UNTESTABLE in this regime, not refuted.")
+        print("  NOTE: the optimism-gap scale fix does NOT change this. Saturation and the")
+        print("        scale bug were independent problems; only the latter was fixed.")
     for c in v.get("comparisons", []):
         print(f"  lambda={c['lambda']}: vs blind {c['mean_diff']:+.4f} "
               f"[{c['ci_lo']:+.4f}, {c['ci_hi']:+.4f}] (n={c['n']})")
