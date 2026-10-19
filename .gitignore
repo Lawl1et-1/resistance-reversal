@@ -16,3 +16,4 @@ logs/
 # Internal working artefacts — kept locally, not published.
 PRODUCT.md
 .impeccable/
+PLAN.md
