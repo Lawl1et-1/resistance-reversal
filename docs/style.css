@@ -387,3 +387,13 @@ footer {
   .ledger-row { grid-template-columns: 1fr; gap: 0.5rem; }
   .plate-no { display: none; }
 }
+
+/* The hero carries a plate designation in the margin, like every other plate, rather than
+   an eyebrow label stacked over the headline. */
+.hero-no { top: clamp(1.4rem, 4vw, 2.4rem); z-index: 1; }
+
+.key-note {
+  color: var(--annot);
+  border-left: 1px solid var(--rule-strong);
+  padding-left: 1rem;
+}
