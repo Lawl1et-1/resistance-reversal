@@ -29,15 +29,14 @@ true reversal happened (see Limitations). Read `DATA.md` before interpreting any
 | M3 | PertFlow (conditional flow matching) plus deep ensemble | done |
 | M4 | split-conformal calibration and abstention | done |
 | M5 | uncertainty-penalised intervention search | done |
+| full run | 5 seeds, all three hypotheses, figures | done (8 h 41 m CPU) |
 | M6 | real sensitive/resistant data | **not started** (`should`) |
 | M7 | active learning | **not started** (`should`) |
 | M8 | mechanistic anchoring | **not started** (`could`) |
 | M9 | paper and figures | **in progress** |
 
-The full-profile experiment run has **not** completed, so this README deliberately contains
-no headline results. Numbers appear only once they exist in `results/full/`; the smoke
-profile exists to prove the pipeline runs and its numbers support no claim (the models are
-deliberately undertrained there).
+The full profile has been run (5 seeds, 8 h 41 m CPU). Every number below is read from
+`results/full/` and is tagged `synthetic`. See Results.
 
 ## Method
 
@@ -75,6 +74,60 @@ come out partly negative.
   yet run)*
 - **H5** Top-ranked targets are enriched for known resistance biology. *(not yet run; needs
   real data)*
+
+## Results
+
+All synthetic, 5 seeds. Full tables in `results/full/`, figures in `figures/full/`, and the
+reasoning behind each verdict in `LOG.md`.
+
+**H1 — deep models do not reliably beat linear baselines. Supported.**
+4 decisive wins against 3 decisive losses over 20 paired comparisons, and the asymmetry is
+the point: largest deep advantage **+0.097**, largest deep deficit **−0.605**.
+
+The sharpest result is an ablation. PertFlow scores **0.229** Pearson-delta on unseen cell
+context where ridge reaches 0.834 — but its own MLP variant, differing *only* in whether
+prediction integrates an ODE, scores 0.830. The flow applies its context conditioning at
+all 20 integration steps, so an untrained context embedding compounds; the regressor applies
+it once. Iterative inference amplifies conditioning error under distribution shift.
+
+The `shuffled_labels` control reaches 0.507 on unseen context and 0.557 on the composition
+split, so roughly half the Pearson-delta signal does not require knowing which perturbation
+was applied.
+
+**H1b — reversal-aware evaluation reorders the models. Supported.**
+5 of 8 comparisons change which model ranks first.
+
+**H2 — coverage reached where exchangeability holds, and fails where it does not. Supported.**
+
+| split | exchangeable | coverage (nominal 0.90) | uncertainty AUROC | abstention helps |
+|---|---|---|---|---|
+| combo (genes seen), n_cal 144 | yes | **0.888** [0.860, 0.914] | 0.697 | yes |
+| combo (genes unseen), n_cal 30 | yes | 0.953 | 0.748 | yes |
+| unseen single, n_cal 15 | yes | 1.000 (conservative) | 0.709 | yes |
+| **unseen context** | **no** | **0.696** [0.660, 0.729] | **0.507** | **no** |
+
+Under context shift three things fail together: coverage collapses, uncertainty becomes
+uninformative (AUROC 0.507 is chance), and abstention stops helping. The shift that breaks
+exchangeability also breaks the ensemble disagreement the calibration is built on.
+
+**H3 — untestable in this regime. No verdict.**
+At λ=0 the search already attains **99.94%** of the oracle optimum (regret 0.0006), so no
+penalty has anything to recover; λ can only do harm, and at λ=2 it does. There is also no
+optimiser's curse present to correct: the optimism gap is **−0.707**, i.e. the model
+*under*estimates reversal (0.244 predicted vs 0.951 verified), while the curse requires
+overestimation. Testing H3 needs a harder search problem. This is reported as untestable
+rather than refuted.
+
+**H4, H5** — not run.
+
+### A statistical correction worth knowing about
+
+The first version of these comparisons paired on `(seed, perturbation, context)`, treating
+720 correlated rows as independent when there are only 5 fitted models. It produced tests
+that contradicted their own confidence intervals (`mean_diff 0.0060, CI [−0.0053, 0.0179],
+p = 0.0000`). Pairing is now at the seed level. A consequence: **with 5 seeds the Wilcoxon
+signed-rank test cannot return p < 0.0625**, so significance at p < 0.05 is unreachable by
+construction and differences are judged by interval and effect size instead.
 
 ## Running it
 
