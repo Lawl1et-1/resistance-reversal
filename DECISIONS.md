@@ -118,6 +118,39 @@ the model systematically underestimates" was **withdrawn** and recomputed; see `
 The oracle scale is still used for ranking, regret and the lambda comparisons, where only
 ordering matters and a constant offset cancels.
 
+## 6. Confidence-interval method — changed after the fact, **widens** every interval
+
+| | |
+|---|---|
+| **Original** | Percentile bootstrap over all rows in a (model, split) cell — about 720 rows. |
+| **Revised** | Hierarchical bootstrap: resample seeds, then perturbations within the drawn seeds. |
+| **Why** | Same nesting problem as change 1. Pooling rows treats perturbations as independent replicates and reports intervals far tighter than the evidence supports. Collapsing to 5 seed means is honest but discards within-seed information. |
+| **Trigger** | After the data, prompted by review. |
+| **Effect** | Every interval widens. On `unseen_single` the widths go from roughly 0.05 to roughly 0.50. |
+
+This change makes every claim **weaker**, which is the opposite direction from changes 2
+and 3, and it is the reason change 7 below became visible.
+
+## 7. Comparison against the shuffled-label control — an **added** analysis
+
+| | |
+|---|---|
+| **Original** | The control was reported in tables; no explicit per-split test of separation. |
+| **Revised** | Each split now reports whether any model's interval clears the control's upper bound. |
+| **Why** | With honest (hierarchical) intervals, several models' intervals visibly overlapped the control's, which is the one comparison the control was built to support. |
+| **Trigger** | After the data. |
+| **Effect** | **Adds a negative finding.** |
+
+Result: on `unseen_single` and `unseen_combo_unseen_genes`, **no model is distinguishable
+from the shuffled-label control**. Ridge reaches 0.416 [0.157, 0.655] against the control's
+0.260 [0.038, 0.474].
+
+This is reported because it is the most defensible finding in the project: it rests on a
+control that was built in before any results existed, it needs no threshold chosen after the
+fact, and it makes the project's conclusions more conservative rather than less. It
+supersedes the gene-holdout columns of the H1 table, which should not be read as evidence of
+generalisation to held-out genes in either direction.
+
 ---
 
 ## Rules fixed before the next run

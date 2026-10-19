@@ -186,6 +186,7 @@ def run(cfg: dict, out_dir: Path) -> dict:
         "network_checks": checks,
         "point_summary": summary.to_dict(orient="records"),
         "paired_tests": _paired(point),
+        "control_separation": _control_separation(summary),
     }
     if not reversal.empty:
         write_table(reversal, out_dir / "h1_reversal_raw.csv")
@@ -271,6 +272,44 @@ def _reversal_summary(reversal: pd.DataFrame) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def _control_separation(summary: pd.DataFrame) -> list[dict]:
+    """Can any model be told apart from the shuffled-label control on this split?
+
+    The shuffled control is fitted with perturbation labels permuted, so its score is what
+    is obtainable *without* knowing which perturbation was applied. If a model's interval
+    overlaps the control's, that split provides no evidence the model learned anything
+    about perturbation identity -- whatever its point estimate looks like next to the other
+    models. This is the comparison the control was added for, and it is reported per split
+    rather than left for a reader to do by eye.
+    """
+    out = []
+    excluded = {"shuffled_labels", "control_mean", "oracle_latent"}
+    for split_name, g in summary.groupby("split"):
+        ctrl = g[g.model == "shuffled_labels"]
+        if ctrl.empty or not np.isfinite(ctrl.pearson_delta.iloc[0]):
+            continue
+        ctrl_hi = float(ctrl.pearson_delta_hi.iloc[0])
+        separated = []
+        for row in g.itertuples():
+            if row.model in excluded or not np.isfinite(row.pearson_delta):
+                continue
+            if float(row.pearson_delta_lo) > ctrl_hi:
+                separated.append(row.model)
+        models = [r.model for r in g.itertuples()
+                  if r.model not in excluded and np.isfinite(r.pearson_delta)]
+        out.append(
+            {
+                "split": split_name,
+                "control_pearson_delta": float(ctrl.pearson_delta.iloc[0]),
+                "control_ci_hi": ctrl_hi,
+                "n_models": len(models),
+                "models_separated_from_control": separated,
+                "any_model_beats_control": bool(separated),
+            }
+        )
+    return out
 
 
 def _readout_sanity(rev_summary: pd.DataFrame) -> list[dict]:
@@ -395,6 +434,10 @@ def _verdict(result: dict) -> dict:
         "n_ranking_winner_changes": len(disagreements),
         "h1b_evaluation_changes_ranking": len(disagreements) > 0,
         "splits_excluded_for_small_test_sets": result.get("excluded_splits", []),
+        "splits_where_no_model_beats_shuffled_control": [
+            s["split"] for s in result.get("control_separation", [])
+            if not s["any_model_beats_control"]
+        ],
         "unreliable_readouts": [
             f"{s['readout']}/{s['split']} (oracle ranked {s['oracle_rank']}/{s['n_models']},"
             f" beaten by {s['oracle_beaten_by']:.3f}"

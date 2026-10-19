@@ -190,6 +190,50 @@ def bootstrap_ci(
     return float(statistic(v)), float(np.quantile(draws, alpha / 2)), float(np.quantile(draws, 1 - alpha / 2))
 
 
+def hierarchical_bootstrap_ci(
+    values: np.ndarray,
+    groups: np.ndarray,
+    n_boot: int = 2000,
+    alpha: float = 0.05,
+    seed: int = 0,
+):
+    """Two-level bootstrap: resample groups, then observations within each drawn group.
+
+    The data here are nested -- many perturbations inside each of a few seeds -- and the two
+    obvious options both waste it. Pooling every row pretends perturbations are independent
+    replicates and gives intervals that are far too tight. Collapsing to one mean per seed
+    is honest but throws away all within-seed information and, at five seeds, leaves
+    intervals so wide that nothing is distinguishable.
+
+    Resampling seeds first and then perturbations within the drawn seeds propagates both
+    variance components, so the interval reflects uncertainty about which seeds were drawn
+    *and* which perturbations were measured. Returns (point, lo, hi).
+    """
+    values = np.asarray(values, float)
+    groups = np.asarray(groups)
+    ok = np.isfinite(values)
+    values, groups = values[ok], groups[ok]
+    if values.size == 0:
+        return float("nan"), float("nan"), float("nan")
+
+    unique = np.unique(groups)
+    members = [np.flatnonzero(groups == g) for g in unique]
+    if len(unique) < 2:
+        return bootstrap_ci(values, n_boot=n_boot, alpha=alpha, seed=seed)
+
+    rng = np.random.default_rng(seed)
+    draws = np.empty(n_boot)
+    for b in range(n_boot):
+        picked = rng.integers(0, len(unique), size=len(unique))
+        sampled = [
+            idx[rng.integers(0, idx.size, size=idx.size)] for idx in (members[p] for p in picked)
+        ]
+        draws[b] = values[np.concatenate(sampled)].mean()
+    # The point estimate averages group means, so one large group cannot dominate it.
+    point = float(np.mean([values[idx].mean() for idx in members]))
+    return point, float(np.quantile(draws, alpha / 2)), float(np.quantile(draws, 1 - alpha / 2))
+
+
 def paired_test(a: np.ndarray, b: np.ndarray, seed: int = 0) -> dict:
     """Paired comparison of two models scored on the same perturbations.
 

@@ -17,6 +17,7 @@ import pandas as pd
 
 from experiments.common import RESULTS, load_config, write_json, write_table
 from experiments.exp_h1_benchmark import (
+    _control_separation,
     _paired,
     _ranking_shift,
     _readout_sanity,
@@ -42,6 +43,7 @@ def main() -> None:
     result = {
         "point_summary": summary.to_dict(orient="records"),
         "paired_tests": _paired(point),
+        "control_separation": _control_separation(summary),
         "recomputed_from": "h1_point_metrics_raw.csv",
     }
 
@@ -67,6 +69,9 @@ def main() -> None:
     print(f"  H1a (deep does not reliably win): {v['h1a_deep_fails_to_reliably_beat_linear']}")
     print(f"  H1b (evaluation changes ranking): {v['h1b_evaluation_changes_ranking']}"
           f" ({v['n_ranking_winner_changes']}/{v['n_ranking_comparisons']} winner changes)")
+    if v.get("splits_where_no_model_beats_shuffled_control"):
+        print("  NO MODEL BEATS THE SHUFFLED CONTROL on: "
+              + ", ".join(v["splits_where_no_model_beats_shuffled_control"]))
     for line in v["unreliable_readouts"]:
         print(f"  UNRELIABLE READOUT: {line}")
     print(f"\nwrote {out_dir}")

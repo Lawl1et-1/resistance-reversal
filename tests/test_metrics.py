@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from src.eval.metrics import (
+    hierarchical_bootstrap_ci,
     auroc_error_detection,
     bootstrap_ci,
     calibration_error,
@@ -148,6 +149,58 @@ def test_bootstrap_ci_handles_degenerate_input():
     assert bootstrap_ci(np.array([3.0])) == (3.0, 3.0, 3.0)
     point, lo, hi = bootstrap_ci(np.array([1.0, np.nan, 3.0]))
     assert np.isfinite([point, lo, hi]).all()
+
+
+def test_hierarchical_bootstrap_is_wider_than_pooling_when_groups_differ():
+    """Pooling nested data pretends every row is an independent replicate."""
+    rng = np.random.default_rng(0)
+    group_means = rng.normal(0.0, 1.0, size=5)  # large between-group variance
+    values, groups = [], []
+    for g, mu in enumerate(group_means):
+        values.append(rng.normal(mu, 0.05, size=100))  # tiny within-group variance
+        groups.append(np.full(100, g))
+    values, groups = np.concatenate(values), np.concatenate(groups)
+
+    _, p_lo, p_hi = bootstrap_ci(values, seed=0)
+    _, h_lo, h_hi = hierarchical_bootstrap_ci(values, groups, seed=0)
+    assert (h_hi - h_lo) > 3 * (p_hi - p_lo), "hierarchical CI must carry group variance"
+
+
+def test_hierarchical_bootstrap_matches_pooling_when_groups_are_alike():
+    rng = np.random.default_rng(0)
+    values = rng.normal(0.0, 1.0, size=500)
+    groups = np.repeat(np.arange(5), 100)  # groups drawn from one distribution
+    _, p_lo, p_hi = bootstrap_ci(values, seed=0)
+    _, h_lo, h_hi = hierarchical_bootstrap_ci(values, groups, seed=0)
+    assert (h_hi - h_lo) < 3 * (p_hi - p_lo)
+
+
+def test_hierarchical_bootstrap_brackets_the_truth():
+    """The estimand is the mean of the groups actually drawn, not the hyper-mean.
+
+    With only a handful of groups the realised group means scatter around the
+    hyper-parameter, so asserting coverage of the hyper-mean would be testing sampling
+    luck rather than the estimator.
+    """
+    rng = np.random.default_rng(1)
+    values, groups, group_means = [], [], []
+    for g in range(6):
+        mu = 5.0 + rng.normal(0, 0.3)
+        group_means.append(mu)
+        values.append(rng.normal(mu, 0.5, size=50))
+        groups.append(np.full(50, g))
+    target = float(np.mean(group_means))
+    point, lo, hi = hierarchical_bootstrap_ci(np.concatenate(values), np.concatenate(groups))
+    assert lo < target < hi
+    assert lo < point < hi
+    assert abs(point - target) < 0.2
+
+
+def test_hierarchical_bootstrap_degenerate_inputs():
+    assert all(np.isnan(x) for x in hierarchical_bootstrap_ci(np.array([]), np.array([])))
+    # A single group falls back to the ordinary bootstrap rather than failing.
+    point, lo, hi = hierarchical_bootstrap_ci(np.arange(20.0), np.zeros(20))
+    assert lo < point < hi
 
 
 def test_paired_test_detects_a_real_difference():

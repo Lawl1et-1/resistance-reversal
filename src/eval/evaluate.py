@@ -14,6 +14,7 @@ from src.data.dataset import CONTROL, PerturbData
 from src.data.splits import Split
 from src.eval.metrics import (
     bootstrap_ci,
+    hierarchical_bootstrap_ci,
     energy_distance,
     mse,
     mse_top_degs,
@@ -130,8 +131,19 @@ def summarise(df: pd.DataFrame, metrics=POINT_METRICS, by=("model", "split"), se
         keys = keys if isinstance(keys, tuple) else (keys,)
         row = dict(zip(by, keys))
         row["n"] = len(g)
+        # Rows are nested inside seeds. Pooling them treats every perturbation as an
+        # independent replicate and gives intervals far tighter than the evidence supports;
+        # the hierarchical bootstrap resamples seeds and then perturbations within them, so
+        # both variance components reach the interval.
+        nested = "seed" in g.columns and g["seed"].nunique() > 1
+        row["n_seeds"] = int(g["seed"].nunique()) if "seed" in g.columns else 1
+        row["ci_method"] = "hierarchical" if nested else "pooled"
         for m in present:
-            point, lo, hi = bootstrap_ci(g[m].to_numpy(), seed=seed)
+            point, lo, hi = (
+                hierarchical_bootstrap_ci(g[m].to_numpy(), g["seed"].to_numpy(), seed=seed)
+                if nested
+                else bootstrap_ci(g[m].to_numpy(), seed=seed)
+            )
             row[m] = point
             row[f"{m}_lo"] = lo
             row[f"{m}_hi"] = hi
