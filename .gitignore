@@ -13,10 +13,6 @@ data/cache/
 logs/
 *.log
 
-# latex build products
-paper/*.aux
-paper/*.bbl
-paper/*.blg
-paper/*.log
-paper/*.out
-paper/*.synctex.gz
+# Internal working artefacts — kept locally, not published.
+PRODUCT.md
+.impeccable/

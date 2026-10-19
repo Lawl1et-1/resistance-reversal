@@ -1,8 +1,12 @@
 # Reversing resistance in silico
 
 **Uncertainty-aware counterfactual search for interventions predicted to shift a
-drug-resistant cell state toward a drug-sensitive transcriptional state — on a synthetic
+drug-resistant cell state toward a drug-sensitive transcriptional state, on a synthetic
 simulator, with no wet-lab validation of any kind.**
+
+This is a solo exploratory project, not a paper and not a submission. It has not been
+peer reviewed, it uses no real data, and the hypotheses below were written and tested by
+one person over a few days. Two of its headline questions came out unresolved.
 
 Instead of modelling how to kill cancer cells, this project learns how perturbations move a
 cell's transcriptional state, then searches for small interventions (at most three gene
@@ -204,7 +208,7 @@ src/eval/        metrics and the evaluation harness
 experiments/     one runnable script per hypothesis; writes results/
 tests/           simulator ground truth, no-leakage, conformal coverage, metric correctness
 results/         JSON and CSV, every file tagged real or synthetic
-paper/           LaTeX draft whose numbers are filled from results/
+docs/            project website; every figure generated from results/
 ```
 
 ## Reproducibility
