@@ -1,0 +1,531 @@
+{
+  "meta": {
+    "profile": "full",
+    "provenance": "synthetic",
+    "seeds": 5,
+    "git_commit": "297f2ec",
+    "generated_from": "results/full/"
+  },
+  "splits": {
+    "unseen_single": "Unseen single gene",
+    "unseen_combo_seen_genes": "Unseen pair, genes seen",
+    "unseen_combo_unseen_genes": "Unseen pair, genes unseen",
+    "unseen_context": "Unseen cell context"
+  },
+  "accuracy": [
+    {
+      "model": "additive",
+      "label": "Additive",
+      "role": "model",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": 0.84,
+          "lo": 0.8063,
+          "hi": 0.8793
+        },
+        "unseen_combo_unseen_genes": {
+          "value": null,
+          "lo": null,
+          "hi": null
+        },
+        "unseen_context": {
+          "value": 0.7323,
+          "lo": 0.6849,
+          "hi": 0.7823
+        },
+        "unseen_single": {
+          "value": null,
+          "lo": null,
+          "hi": null
+        }
+      }
+    },
+    {
+      "model": "control_mean",
+      "label": "No-change control",
+      "role": "control",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": null,
+          "lo": null,
+          "hi": null
+        },
+        "unseen_combo_unseen_genes": {
+          "value": null,
+          "lo": null,
+          "hi": null
+        },
+        "unseen_context": {
+          "value": null,
+          "lo": null,
+          "hi": null
+        },
+        "unseen_single": {
+          "value": null,
+          "lo": null,
+          "hi": null
+        }
+      }
+    },
+    {
+      "model": "low_rank_linear",
+      "label": "Low-rank linear",
+      "role": "model",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": 0.8258,
+          "lo": 0.782,
+          "hi": 0.8726
+        },
+        "unseen_combo_unseen_genes": {
+          "value": 0.4356,
+          "lo": 0.1511,
+          "hi": 0.694
+        },
+        "unseen_context": {
+          "value": 0.7936,
+          "lo": 0.742,
+          "hi": 0.8434
+        },
+        "unseen_single": {
+          "value": 0.4155,
+          "lo": 0.1552,
+          "hi": 0.6543
+        }
+      }
+    },
+    {
+      "model": "oracle_latent",
+      "label": "Latent oracle",
+      "role": "ceiling",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": 0.9184,
+          "lo": 0.8987,
+          "hi": 0.9392
+        },
+        "unseen_combo_unseen_genes": {
+          "value": 0.8298,
+          "lo": 0.7702,
+          "hi": 0.887
+        },
+        "unseen_context": {
+          "value": 0.9138,
+          "lo": 0.8867,
+          "hi": 0.9385
+        },
+        "unseen_single": {
+          "value": 0.7993,
+          "lo": 0.7222,
+          "hi": 0.8775
+        }
+      }
+    },
+    {
+      "model": "pertflow",
+      "label": "PertFlow (flow)",
+      "role": "model",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": 0.846,
+          "lo": 0.8157,
+          "hi": 0.8811
+        },
+        "unseen_combo_unseen_genes": {
+          "value": 0.395,
+          "lo": 0.1569,
+          "hi": 0.6223
+        },
+        "unseen_context": {
+          "value": 0.229,
+          "lo": 0.1028,
+          "hi": 0.3511
+        },
+        "unseen_single": {
+          "value": 0.3904,
+          "lo": 0.1689,
+          "hi": 0.5843
+        }
+      }
+    },
+    {
+      "model": "pertflow_mlp",
+      "label": "PertFlow (no integration)",
+      "role": "model",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": 0.8657,
+          "lo": 0.8441,
+          "hi": 0.8906
+        },
+        "unseen_combo_unseen_genes": {
+          "value": 0.4103,
+          "lo": 0.1626,
+          "hi": 0.6617
+        },
+        "unseen_context": {
+          "value": 0.8297,
+          "lo": 0.805,
+          "hi": 0.8547
+        },
+        "unseen_single": {
+          "value": 0.395,
+          "lo": 0.1597,
+          "hi": 0.6297
+        }
+      }
+    },
+    {
+      "model": "ridge_embedding",
+      "label": "Ridge (gene embeddings)",
+      "role": "model",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": 0.8587,
+          "lo": 0.8238,
+          "hi": 0.896
+        },
+        "unseen_combo_unseen_genes": {
+          "value": 0.4408,
+          "lo": 0.1545,
+          "hi": 0.6989
+        },
+        "unseen_context": {
+          "value": 0.8344,
+          "lo": 0.7927,
+          "hi": 0.8739
+        },
+        "unseen_single": {
+          "value": 0.4164,
+          "lo": 0.1566,
+          "hi": 0.6548
+        }
+      }
+    },
+    {
+      "model": "shuffled_labels",
+      "label": "Shuffled labels",
+      "role": "control",
+      "by_split": {
+        "unseen_combo_seen_genes": {
+          "value": 0.5573,
+          "lo": 0.486,
+          "hi": 0.6317
+        },
+        "unseen_combo_unseen_genes": {
+          "value": 0.3406,
+          "lo": 0.0804,
+          "hi": 0.5972
+        },
+        "unseen_context": {
+          "value": 0.5073,
+          "lo": 0.4599,
+          "hi": 0.5561
+        },
+        "unseen_single": {
+          "value": 0.2605,
+          "lo": 0.0383,
+          "hi": 0.4744
+        }
+      }
+    }
+  ],
+  "coverage": [
+    {
+      "split": "unseen_combo_seen_genes",
+      "label": "Unseen pair, genes seen",
+      "exchangeable": true,
+      "coverage": 0.8875,
+      "lo": 0.8597,
+      "hi": 0.9139,
+      "auroc": 0.6966,
+      "risk_half": 2.9823,
+      "risk_all": 3.5312,
+      "abstention_helps": true
+    },
+    {
+      "split": "unseen_combo_unseen_genes",
+      "label": "Unseen pair, genes unseen",
+      "exchangeable": true,
+      "coverage": 0.9533,
+      "lo": 0.9133,
+      "hi": 0.9933,
+      "auroc": 0.7477,
+      "risk_half": 4.209,
+      "risk_all": 4.5492,
+      "abstention_helps": true
+    },
+    {
+      "split": "unseen_context",
+      "label": "Unseen cell context",
+      "exchangeable": false,
+      "coverage": 0.6962,
+      "lo": 0.66,
+      "hi": 0.7286,
+      "auroc": 0.5069,
+      "risk_half": 5.1313,
+      "risk_all": 5.0999,
+      "abstention_helps": false
+    },
+    {
+      "split": "unseen_single",
+      "label": "Unseen single gene",
+      "exchangeable": true,
+      "coverage": 1.0,
+      "lo": 1.0,
+      "hi": 1.0,
+      "auroc": 0.7091,
+      "risk_half": 2.8789,
+      "risk_all": 3.3899,
+      "abstention_helps": true
+    }
+  ],
+  "search": [
+    {
+      "lam": 0.0,
+      "verified": 0.9508,
+      "lo": 0.9169,
+      "hi": 0.9732,
+      "regret": 0.0006
+    },
+    {
+      "lam": 0.5,
+      "verified": 0.9499,
+      "lo": 0.916,
+      "hi": 0.9721,
+      "regret": 0.0015
+    },
+    {
+      "lam": 1.0,
+      "verified": 0.9476,
+      "lo": 0.9148,
+      "hi": 0.9693,
+      "regret": 0.0038
+    },
+    {
+      "lam": 2.0,
+      "verified": 0.7628,
+      "lo": 0.4002,
+      "hi": 0.9642,
+      "regret": 0.1885
+    }
+  ],
+  "control": [
+    {
+      "split": "unseen_combo_seen_genes",
+      "label": "Unseen pair, genes seen",
+      "n_per_run": 48,
+      "powered": true,
+      "status": "at_least_one_model_beats_control",
+      "comparisons": [
+        {
+          "model": "additive",
+          "label": "Additive",
+          "diff": 0.2827,
+          "lo": 0.2361,
+          "hi": 0.3193,
+          "beats": true
+        },
+        {
+          "model": "low_rank_linear",
+          "label": "Low-rank linear",
+          "diff": 0.2686,
+          "lo": 0.23,
+          "hi": 0.2987,
+          "beats": true
+        },
+        {
+          "model": "pertflow",
+          "label": "PertFlow (flow)",
+          "diff": 0.2887,
+          "lo": 0.2525,
+          "hi": 0.3226,
+          "beats": true
+        },
+        {
+          "model": "pertflow_mlp",
+          "label": "PertFlow (no integration)",
+          "diff": 0.3085,
+          "lo": 0.265,
+          "hi": 0.348,
+          "beats": true
+        },
+        {
+          "model": "ridge_embedding",
+          "label": "Ridge (gene embeddings)",
+          "diff": 0.3014,
+          "lo": 0.2602,
+          "hi": 0.3369,
+          "beats": true
+        }
+      ]
+    },
+    {
+      "split": "unseen_combo_unseen_genes",
+      "label": "Unseen pair, genes unseen",
+      "n_per_run": 10,
+      "powered": false,
+      "status": "inconclusive_at_this_size",
+      "comparisons": [
+        {
+          "model": "low_rank_linear",
+          "label": "Low-rank linear",
+          "diff": 0.095,
+          "lo": -0.0224,
+          "hi": 0.2182,
+          "beats": false
+        },
+        {
+          "model": "pertflow",
+          "label": "PertFlow (flow)",
+          "diff": 0.0544,
+          "lo": -0.0886,
+          "hi": 0.2041,
+          "beats": false
+        },
+        {
+          "model": "pertflow_mlp",
+          "label": "PertFlow (no integration)",
+          "diff": 0.0698,
+          "lo": -0.0578,
+          "hi": 0.1974,
+          "beats": false
+        },
+        {
+          "model": "ridge_embedding",
+          "label": "Ridge (gene embeddings)",
+          "diff": 0.1003,
+          "lo": -0.0202,
+          "hi": 0.2262,
+          "beats": false
+        }
+      ]
+    },
+    {
+      "split": "unseen_context",
+      "label": "Unseen cell context",
+      "n_per_run": 210,
+      "powered": true,
+      "status": "at_least_one_model_beats_control",
+      "comparisons": [
+        {
+          "model": "additive",
+          "label": "Additive",
+          "diff": 0.225,
+          "lo": 0.2039,
+          "hi": 0.256,
+          "beats": true
+        },
+        {
+          "model": "low_rank_linear",
+          "label": "Low-rank linear",
+          "diff": 0.2863,
+          "lo": 0.2367,
+          "hi": 0.3298,
+          "beats": true
+        },
+        {
+          "model": "pertflow",
+          "label": "PertFlow (flow)",
+          "diff": -0.2783,
+          "lo": -0.4221,
+          "hi": -0.1345,
+          "beats": false
+        },
+        {
+          "model": "pertflow_mlp",
+          "label": "PertFlow (no integration)",
+          "diff": 0.3224,
+          "lo": 0.2898,
+          "hi": 0.353,
+          "beats": true
+        },
+        {
+          "model": "ridge_embedding",
+          "label": "Ridge (gene embeddings)",
+          "diff": 0.3271,
+          "lo": 0.2767,
+          "hi": 0.3644,
+          "beats": true
+        }
+      ]
+    },
+    {
+      "split": "unseen_single",
+      "label": "Unseen single gene",
+      "n_per_run": 5,
+      "powered": false,
+      "status": "inconclusive_at_this_size",
+      "comparisons": [
+        {
+          "model": "low_rank_linear",
+          "label": "Low-rank linear",
+          "diff": 0.1551,
+          "lo": -0.0751,
+          "hi": 0.4076,
+          "beats": false
+        },
+        {
+          "model": "pertflow",
+          "label": "PertFlow (flow)",
+          "diff": 0.1299,
+          "lo": -0.0228,
+          "hi": 0.2856,
+          "beats": false
+        },
+        {
+          "model": "pertflow_mlp",
+          "label": "PertFlow (no integration)",
+          "diff": 0.1345,
+          "lo": -0.0152,
+          "hi": 0.2846,
+          "beats": false
+        },
+        {
+          "model": "ridge_embedding",
+          "label": "Ridge (gene embeddings)",
+          "diff": 0.1559,
+          "lo": -0.0708,
+          "hi": 0.4108,
+          "beats": false
+        }
+      ]
+    }
+  ],
+  "verdicts": {
+    "h1a": {
+      "status": "inconclusive",
+      "descriptive": "4 decisive wins and 3 decisive losses over 20 paired comparisons; largest deep advantage +0.097, largest deficit -0.605",
+      "preregistered_rule": false,
+      "revised_rule": true,
+      "rules_agree": false,
+      "wins": 4,
+      "losses": 3,
+      "n": 20
+    },
+    "h1b": {
+      "status": "supported",
+      "changes": 5,
+      "of": 8
+    },
+    "h2": {
+      "status": "supported where exchangeable",
+      "nominal": 0.9,
+      "reached": 3,
+      "valid": 3,
+      "shifted": {
+        "unseen_context": 0.6961904761904762
+      }
+    },
+    "h3": {
+      "status": "untestable",
+      "why": "lambda=0 already attains the oracle within 1%, so no penalty can improve the recommendation regardless of how optimism is measured",
+      "blind_regret": 0.0006,
+      "optimism_gap": {
+        "mean": -0.2065566200190539,
+        "ci_lo": -0.24841871197668236,
+        "ci_hi": -0.1526055087154973
+      }
+    }
+  }
+}

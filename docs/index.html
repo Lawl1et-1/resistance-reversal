@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reversing resistance in silico — calibrated counterfactual search over cell states</title>
+<meta name="description" content="Can a model predict how perturbations move a cell between stable transcriptional states, search for interventions that reverse drug resistance, and know when it should not be trusted? A synthetic-simulator study.">
+<meta name="color-scheme" content="light">
+<meta property="og:title" content="Reversing resistance in silico">
+<meta property="og:description" content="Calibrated uncertainty works — until the cell context changes. A synthetic-simulator study of counterfactual intervention search.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23d7dce2'/><path d='M2 30 Q16 30 16 16 Q16 2 30 2' stroke='%230d1116' fill='none' stroke-width='2'/><circle cx='7' cy='25' r='3' fill='%23c3351a'/><circle cx='25' cy='7' r='3' fill='%2317407e'/></svg>">
+</head>
+<body>
+<!--
+THESIS: A cell state is a point in a bistable system, so "reversing resistance" is a basin
+crossing, not a nudge; this page is the phase plate that argument lives on, and refuses the
+ML-result-page arrangement of dark hero, gradient and a table of wins.
+OWN-WORLD: Dynamical-systems atlas plate. Pale slate plate stock; two basins of attraction
+as page-scale colour fields, vermilion resistant and indigo sensitive; one separatrix rule
+running the document's full height as its spine; ink curves with arrowheads; Archivo with
+Courier Prime draughtsman annotation; state carried by stroke pattern, never hue.
+STORY: A reader sees the two states and the boundary between them, learns that calibrated
+uncertainty holds inside the known region and fails at that boundary, and leaves knowing
+which questions the work answered and which it could not.
+FIRST VIEWPORT: The live phase portrait fills the screen, separatrix cutting corner to
+corner, basins flooded in their colours; title set inside the resistant basin, lower left,
+with the basin key beneath it; no nav, no buttons.
+FORM: Attractor phase plate, candidate 1 of my ordered grounded list, chosen by the user
+over the roll's assignment (pharmaceutical insert); seed key de966764.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+<div class="spine" aria-hidden="true"></div>
+
+<main>
+
+<section class="hero">
+  <canvas id="phase-hero" aria-hidden="true"></canvas>
+  <div class="wrap hero-title">
+    <span class="annot">A synthetic-simulator study · in silico only</span>
+    <h1>Reversing resistance in silico</h1>
+    <p class="lede">A drug-resistant cell and a drug-sensitive one are two stable states of
+      the same system. This work learns how perturbations move a cell between them, searches
+      for interventions that would cross the boundary — and calibrates when the model should
+      not be believed.</p>
+    <div class="basin-key">
+      <span><i class="key-res"></i> resistant basin</span>
+      <span><i class="key-sen"></i> sensitive basin</span>
+      <span>separatrix</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">I</span>
+  <div class="wrap">
+    <span class="annot">Plate I · the mechanism</span>
+    <h2>Reversal is a basin crossing</h2>
+    <div class="measure">
+      <p>The simulator is a toggle switch: two master regulators, each activating itself and
+        repressing the other. That gives two stable states with a boundary between them. A
+        perturbation does not nudge expression. It moves the boundary, and the cell falls into whichever basin it then finds itself in.</p>
+      <p>Below is that system, integrated live from the model's own equations. Drag the cell.
+        Knock down a regulator and watch the separatrix move.</p>
+    </div>
+
+    <figure class="plate-figure">
+      <canvas id="phase-interactive" width="1200" height="620"
+        aria-label="Interactive phase portrait. Drag the cell marker to set its starting state; toggle gene knockdowns to move the separatrix."
+        role="img" tabindex="0"></canvas>
+      <div class="controls" id="knockdowns" role="group" aria-label="Gene knockdowns"></div>
+      <figcaption class="plate-caption">
+        Horizontal axis: resistance master regulator. Vertical: sensitive master regulator.
+        Filled circles are stable fixed points; the open circle is the unstable point on the
+        separatrix. The trajectory is Euler-integrated from the same update rule used in the
+        experiments. <strong>Synthetic.</strong>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">II</span>
+  <div class="wrap">
+    <span class="annot">Plate II · finding one</span>
+    <h2>Calibration holds — then fails at the boundary, all at once</h2>
+    <div class="measure">
+      <p>The model carries conformal prediction intervals, which promise to contain the truth
+        <span class="num" data-field="nominalPct">90</span>% of the time. On held-out
+        perturbations they do, almost exactly:
+        <span class="num" data-field="bestCoverage">—</span>.</p>
+      <p>Move to a <strong>cell context the model never saw</strong> and three things fail
+        together: coverage drops to <span class="num" data-field="shiftedCoverage">—</span>,
+        the uncertainty estimate becomes no better than a coin flip at flagging its own
+        errors (AUROC <span class="num" data-field="shiftedAuroc">—</span>), and abstaining
+        on the least-confident predictions stops helping.</p>
+      <p>This is what conformal theory predicts when its exchangeability assumption breaks,
+        so it is a <em>confirmation</em>, not a discovery. What is striking is that all three
+        safety properties fail at the same boundary: the uncertainty machinery gives no
+        warning precisely where it stops working.</p>
+    </div>
+    <div class="chart" id="chart-coverage"></div>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">III</span>
+  <div class="wrap">
+    <span class="annot">Plate III · finding two</span>
+    <h2>How you measure decides which model wins</h2>
+    <div class="measure">
+      <p>Rank the models by the conventional accuracy metric, then by how well they actually
+        rank candidate interventions, and the winner changes in
+        <span class="num" data-field="rankChanges">—</span> of
+        <span class="num" data-field="rankOf">—</span> comparisons.</p>
+      <p>The dashed line below is a control model fitted on <strong>shuffled</strong>
+        perturbation labels, and by construction cannot know which perturbation was applied.
+        It still scores around half the conventional metric. Much of what that metric rewards
+        does not require knowing the perturbation at all.</p>
+    </div>
+    <div class="chart" id="chart-accuracy"></div>
+    <div class="table-scroll" id="table-accuracy"></div>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">IV</span>
+  <div class="wrap">
+    <span class="annot">Plate IV · finding three, preliminary</span>
+    <h2>The flow model collapses where its twin does not</h2>
+    <div class="measure">
+      <p>On unseen cell contexts the flow model scores
+        <span class="num" data-field="flowContext">—</span>, against
+        <span class="num" data-field="ridgeContext">—</span> for ridge regression. An
+        otherwise identical model that skips the iterative integration step scores
+        <span class="num" data-field="mlpContext">—</span>.</p>
+      <p>The two differ only in whether prediction integrates an ODE across twenty steps. A
+        supporting check — reducing the integration budget at inference on fixed weights —
+        recovers the loss on the shifted split while leaving an unshifted control flat. That
+        points to error compounding across integration under distribution shift.</p>
+      <p><strong>We stop there and name no cause.</strong> The obvious explanation, an
+        untrained context embedding, predicts that longer training changes nothing; longer
+        training measurably hurt. Supporting evidence exists only at small scale on one seed,
+        so this is reported as an observation, not a result.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">V</span>
+  <div class="wrap">
+    <span class="annot">Plate V · verdicts</span>
+    <h2>What this work could not conclude</h2>
+    <div class="measure">
+      <p>Two of the headline questions did not resolve. They are given the same weight here
+        as the findings, because the honest answer to a question you could not settle is not
+        a quieter version of an answer.</p>
+    </div>
+    <dl class="ledger" id="ledger"></dl>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">VI</span>
+  <div class="wrap">
+    <span class="annot">Plate VI · corrections</span>
+    <h2>Claims that did not survive</h2>
+    <div class="measure">
+      <p>Thirteen defects were found and recorded during the build. Four of them would have
+        produced a convincing but false result. These are the claims that were written down
+        and then withdrawn. They hang here rather than being deleted, because the corrections
+        are the evidence that the surviving numbers were checked.</p>
+    </div>
+    <div class="trims">
+
+      <div class="trim">
+        <span class="trim-pin">01</span>
+        <div>
+          <span class="struck">Deep models fail to generalise to held-out genes — every model
+            scored 0.00.</span>
+          <strong class="corrected">Withdrawn: the split was unsolvable in principle.</strong>
+          <p class="why">Upstream regulators were mutually independent, so co-expression
+            carried no information about gene function (embedding to effect correlation −0.11).
+            No model could have transferred. The simulator was rebuilt with pathway modules;
+            the correlation became +0.93.</p>
+        </div>
+      </div>
+
+      <div class="trim">
+        <span class="trim-pin">02</span>
+        <div>
+          <span class="struck">The flow model predicts the post-perturbation population
+            well.</span>
+          <strong class="corrected">Withdrawn: it was collapsing the population to a
+            point.</strong>
+          <p class="why">Conditioning the velocity field on the starting cell meant a
+            deterministic ODE could only run to the conditional mean. Predicted spread 0.30
+            against a true 0.86, and an energy distance worse than predicting no change at
+            all. Point metrics looked fine throughout.</p>
+        </div>
+      </div>
+
+      <div class="trim">
+        <span class="trim-pin">03</span>
+        <div>
+          <span class="struck">The model systematically underestimates reversal by 0.71 —
+            there is no optimiser's curse to correct.</span>
+          <strong class="corrected">Withdrawn: that figure was mostly a scale error.</strong>
+          <p class="why">A prediction made through the learned readout was being subtracted
+            from a value on the simulator's own scale. Measured against the observed outcome
+            through the same readout, the gap is −0.21. The underestimation is real but a
+            third the size.</p>
+        </div>
+      </div>
+
+      <div class="trim">
+        <span class="trim-pin">04</span>
+        <div>
+          <span class="struck">Both sensitivity readouts are unreliable — the oracle ranks
+            below the models.</span>
+          <strong class="corrected">Withdrawn: the diagnostic was broken, not the
+            readouts.</strong>
+          <p class="why">The oracle exposed only a mean shift, so its "predicted population"
+            was the control cells plus a constant — which cannot represent a population
+            moving into a different basin. A diagnostic that condemns everything is usually
+            the thing at fault.</p>
+        </div>
+      </div>
+
+      <div class="trim">
+        <span class="trim-pin">05</span>
+        <div>
+          <span class="struck">No model beats the shuffled-label control on gene-holdout
+            splits.</span>
+          <strong class="corrected">Corrected: inconclusive at that size.</strong>
+          <p class="why">The first test compared confidence intervals for overlap, which is
+            crude and conservative. Paired at the seed level the point estimates favour the
+            models (+0.05 to +0.16). With 5 and 10 test perturbations per run the intervals
+            simply cannot resolve it. Absence of evidence is not evidence of absence.</p>
+        </div>
+      </div>
+
+      <div class="trim">
+        <span class="trim-pin">06</span>
+        <div>
+          <span class="struck">Deep models do not reliably beat linear baselines
+            (supported).</span>
+          <strong class="corrected">Downgraded to inconclusive.</strong>
+          <p class="why">The verdict flips depending on how "reliably beats" is defined, and
+            the definition that produced it was written after seeing the win/loss counts. An
+            audit script recomputes every verdict under both the original and revised rules.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">VII</span>
+  <div class="wrap">
+    <span class="annot">Plate VII · the search</span>
+    <h2>Why the intervention search could not be tested</h2>
+    <div class="measure">
+      <p>The design was to compare uncertainty-blind search against search that penalises
+        uncertainty, expecting the penalty to help. It cannot be tested here: without any
+        penalty the search already finds
+        <span class="num" data-field="blindPct">—</span> of the best possible intervention.
+        There is no room left for a penalty to recover, so it can only do harm, and at the
+        largest penalty it does.</p>
+    </div>
+    <div class="table-scroll" id="table-search"></div>
+    <div class="caution">
+      <h3>This is a flaw in the experiment, not a result about the idea</h3>
+      <p>A design where the baseline already succeeds cannot discriminate between methods.
+        Testing it properly needs a harder search problem, a larger candidate space or a
+        weaker model, and that regime should be specified in writing before it is run,
+        rather than built until the hypothesis appears.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="plate-no">VIII</span>
+  <div class="wrap">
+    <span class="annot">Plate VIII · limitations</span>
+    <h2>What this is not</h2>
+    <div class="caution">
+      <h3>No wet-lab validation. No biological or clinical claim.</h3>
+      <p>Every number on this page comes from a simulator written for this project. Its
+        structure encodes a hypothesis about how resistance states behave; it is not a
+        measurement of one. Nothing here has been tested in cells, and the object of study is
+        a <em>predicted shift toward a drug-sensitive transcriptional state</em>: not a
+        treatment, not a cure, and not a demonstration that resistance can be reversed in
+        anything living.</p>
+    </div>
+    <div class="measure">
+      <p style="margin-top:2rem">Further limits worth stating plainly: the sensitivity score
+        is a learned proxy whose two independent readouts disagree sharply on predicted
+        post-perturbation states. Only five seeds were run, which cannot reach conventional
+        significance under the paired test used, so results are reported as intervals and
+        effect sizes. And several analysis rules were revised after results arrived, logged
+        with their counterfactual verdicts rather than presented as a clean story.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <span class="annot">Reproducing it</span>
+        <p>Fixed seeds throughout. Every results file records the git commit, config and
+          library versions, and carries a <code>real</code> or <code>synthetic</code>
+          provenance tag. The full profile takes about nine hours on CPU.</p>
+      </div>
+      <div>
+        <span class="annot">Documents</span>
+        <p><strong>LOG.md</strong>: decisions and, at length, the failures.<br>
+          <strong>DECISIONS.md</strong>: every analysis rule changed after results arrived,
+          with what the original rule would have concluded.<br>
+          <strong>MODEL_CARD.md</strong>: intended use, and what this must not be used for.</p>
+      </div>
+      <div>
+        <span class="annot">Source</span>
+        <p>All figures on this page are drawn from
+          <code>results/full/</code> at build time.</p>
+        <a class="repo-link" href="https://github.com/Lawliet-01/resistance-reversal">Repository →</a>
+      </div>
+    </div>
+    <p style="margin-top:3rem"><span class="annot" id="provenance-line">Synthetic data · generated from results/full/</span></p>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

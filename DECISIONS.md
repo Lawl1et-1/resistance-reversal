@@ -129,7 +129,10 @@ ordering matters and a constant offset cancels.
 | **Effect** | Every interval widens. On `unseen_single` the widths go from roughly 0.05 to roughly 0.50. |
 
 This change makes every claim **weaker**, which is the opposite direction from changes 2
-and 3, and it is the reason change 7 below became visible.
+and 3, and it is the reason change 7 below became visible. That direction is **not** an
+exemption from the forking-paths concern: it was still chosen after seeing results, and a
+reader should weigh it as such. The argument for it is that pooling nested observations
+misstates the quantity being estimated regardless of which way the answer moves.
 
 ## 7. Comparison against the shuffled-label control — an **added** analysis
 
@@ -141,15 +144,33 @@ and 3, and it is the reason change 7 below became visible.
 | **Trigger** | After the data. |
 | **Effect** | **Adds a negative finding.** |
 
-Result: on `unseen_single` and `unseen_combo_unseen_genes`, **no model is distinguishable
-from the shuffled-label control**. Ridge reaches 0.416 [0.157, 0.655] against the control's
-0.260 [0.038, 0.474].
+**Corrected after review.** The first version of this check compared confidence intervals
+for overlap, which is both crude and conservative, and I described the outcome as "no model
+is distinguishable from the shuffled control" and called it the project's most defensible
+finding. Both parts were wrong:
 
-This is reported because it is the most defensible finding in the project: it rests on a
-control that was built in before any results existed, it needs no threshold chosen after the
-fact, and it makes the project's conclusions more conservative rather than less. It
-supersedes the gene-holdout columns of the H1 table, which should not be read as evidence of
-generalisation to held-out genes in either direction.
+- The right statistic is the **paired difference** between each model and the control at the
+  seed level, since they are evaluated on the same seeds and perturbations. That is what is
+  now reported.
+- On the gene-holdout splits the point estimates **favour the models** (+0.054 to +0.156);
+  the intervals are simply too wide to resolve. With 5 and 10 test perturbations per run the
+  correct description is **"inconclusive at this size"**, not "models do no better than
+  chance". Absence of evidence is not evidence of absence.
+
+A further judgement call, also made after seeing the data: a split needs at least **20 test
+perturbations per run** before a failure to separate is treated as informative rather than
+underpowered (`MIN_PERTS_FOR_CONTROL_TEST`). Under that threshold both gene-holdout splits
+are reported as inconclusive.
+
+What the corrected test does show, on the two adequately powered splits:
+
+| split | perturbations/run | ridge vs control | pertflow vs control |
+|---|---|---|---|
+| combo (genes seen) | 48 | +0.301 [0.260, 0.337] | +0.289 |
+| unseen context | 210 | +0.327 [0.277, 0.364] | **-0.278 [-0.422, -0.135]** |
+
+The second row is a finding the overlap test had hidden: on unseen contexts the flow model
+is **significantly worse than a model fitted on shuffled perturbation labels**.
 
 ---
 

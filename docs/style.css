@@ -1,0 +1,389 @@
+/* Phase plate — a mathematical plate from a dynamical-systems atlas.
+   Two basins of attraction are the page's colour, at page scale; the separatrix is the
+   spine that runs the whole document. Ink is for curves and type. Accent never floats
+   free: it belongs to a basin field or a hairline rule. */
+
+:root {
+  --plate: #d7dce2;          /* plate stock — the ground is the colour, not the mark */
+  --plate-deep: #c6ccd4;
+  --ink: #0d1116;
+  --ink-soft: #3d474f;
+  --annot: #495460;          /* AA on both plate stocks; annotation type is small, so 4.5:1 binds */
+  --basin-res: #c3351a;      /* resistant basin */
+  --basin-sen: #17407e;      /* sensitive basin */
+  --basin-res-field: #e3a699;
+  --basin-sen-field: #a9b9d4;
+  --rule: rgba(13, 17, 22, 0.26);
+  --rule-strong: rgba(13, 17, 22, 0.55);
+  --measure: 34rem;
+  --gutter: clamp(1rem, 4vw, 4rem);
+  --spine: clamp(2.2rem, 7vw, 5.5rem);
+
+  --sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --mono: "Courier Prime", ui-monospace, "Courier New", monospace;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--plate);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: clamp(1rem, 0.96rem + 0.2vw, 1.09rem);
+  line-height: 1.62;
+  font-synthesis-weight: none;
+  overflow-x: hidden;
+}
+
+/* The separatrix: one continuous vertical rule the whole document hangs from. */
+.spine {
+  position: absolute;
+  left: var(--spine);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule-strong);
+  pointer-events: none;
+}
+
+main { position: relative; }
+
+section {
+  position: relative;
+  padding: clamp(4rem, 9vw, 8rem) var(--gutter) clamp(4rem, 9vw, 8rem)
+    calc(var(--spine) + clamp(1.4rem, 4vw, 3.5rem));
+  border-top: 1px solid var(--rule);
+}
+
+section:first-of-type { border-top: 0; }
+
+.wrap { max-width: 64rem; }
+.measure { max-width: var(--measure); }
+
+/* --- plate annotation ------------------------------------------------------------ */
+
+.annot {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--annot);
+  display: block;
+  margin-bottom: 1.1rem;
+}
+
+/* A plate numbers its figures; the number is set in the margin, on the separatrix. */
+.plate-no {
+  position: absolute;
+  left: 0;
+  top: clamp(4rem, 9vw, 8rem);
+  width: var(--spine);
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--annot);
+  padding-top: 0.2rem;
+}
+
+h1, h2, h3 {
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.022em;
+  margin: 0 0 1rem;
+  text-wrap: balance;
+}
+
+h1 { font-size: clamp(2.6rem, 7.5vw, 5.6rem); }
+h2 { font-size: clamp(1.8rem, 3.8vw, 2.9rem); margin-bottom: 1.4rem; }
+h3 { font-size: clamp(1.08rem, 1.7vw, 1.3rem); letter-spacing: -0.012em; }
+
+p { margin: 0 0 1.1rem; }
+.lede { font-size: clamp(1.1rem, 1.5vw, 1.32rem); line-height: 1.5; color: var(--ink-soft); }
+
+strong { font-weight: 700; }
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+a:hover { text-decoration-thickness: 2px; }
+
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* --- hero: the phase plane IS the first viewport ---------------------------------- */
+
+.hero {
+  min-height: 100svh;
+  display: grid;
+  align-content: end;
+  padding-bottom: clamp(2.5rem, 6vw, 5rem);
+  overflow: hidden;
+}
+
+#phase-hero {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hero > * { position: relative; }
+
+.hero-title {
+  /* The plate's ink runs behind the title, so the type sits on its own stock panel
+     rather than fighting the trajectories. */
+  background: color-mix(in srgb, var(--plate) 88%, transparent);
+  border-left: 2px solid var(--ink);
+  padding: clamp(1.2rem, 3vw, 2rem) clamp(1.2rem, 3vw, 2.2rem);
+  max-width: 54rem;
+  backdrop-filter: blur(2px);
+}
+
+.hero h1 { max-width: 16ch; }
+
+.hero .lede {
+  max-width: 44ch;
+  color: var(--ink);
+}
+
+.basin-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  margin-top: 2rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.basin-key span { display: flex; align-items: center; gap: 0.5rem; }
+
+.basin-key i {
+  width: 1.6rem;
+  height: 0.55rem;
+  display: block;
+}
+
+.key-res { background: var(--basin-res-field); outline: 1px solid var(--basin-res); }
+.key-sen { background: var(--basin-sen-field); outline: 1px solid var(--basin-sen); }
+
+/* --- interactive plate ------------------------------------------------------------ */
+
+.plate-figure {
+  border: 1px solid var(--rule-strong);
+  background: var(--plate-deep);
+  margin: 2rem 0 0;
+}
+
+.plate-figure canvas { display: block; width: 100%; height: auto; touch-action: none; }
+
+.plate-caption {
+  border-top: 1px solid var(--rule);
+  padding: 0.75rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--annot);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+.knock {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.8rem;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  cursor: pointer;
+  transition: background 0.12s linear, color 0.12s linear;
+}
+
+.knock[aria-pressed="true"] { background: var(--ink); color: var(--plate); }
+.knock:focus-visible { outline: 2px solid var(--basin-sen); outline-offset: 2px; }
+
+/* --- charts ----------------------------------------------------------------------- */
+
+.chart { margin: 1.6rem 0 0; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--mono); font-size: 10px; fill: var(--annot); }
+.chart .bar-label { fill: var(--ink); }
+.chart .nominal { stroke: var(--basin-res); stroke-width: 1.5; stroke-dasharray: 5 3; }
+
+/* --- verdict ledger: state is stroke pattern, never hue -------------------------- */
+
+.ledger { border-top: 1px solid var(--rule-strong); margin-top: 2rem; }
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto;
+  gap: 1rem;
+  align-items: start;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.ledger-row dt {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.ledger-row dd { margin: 0; }
+.ledger-row .why { color: var(--ink-soft); font-size: 0.93rem; margin: 0.3rem 0 0; }
+
+.state { display: flex; align-items: center; gap: 0.6rem; white-space: nowrap; }
+
+.state svg { display: block; flex: none; }
+
+.state span {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--annot);
+}
+
+/* --- trims: withdrawn claims hang visibly, never deleted ------------------------- */
+
+.trims { display: grid; gap: 0; margin-top: 2rem; border-top: 1px solid var(--rule-strong); }
+
+.trim {
+  padding: 1.15rem 0;
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 1.6rem 1fr;
+  gap: 1rem;
+}
+
+.trim-pin {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--annot);
+  padding-top: 0.15rem;
+}
+
+.trim .struck {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: var(--annot);
+}
+
+.trim .corrected { display: block; margin-top: 0.35rem; }
+
+/* --- tables ----------------------------------------------------------------------- */
+
+.table-scroll { overflow-x: auto; margin-top: 1.6rem; }
+
+table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 0.86rem; }
+
+caption {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--annot);
+  padding-bottom: 0.7rem;
+}
+
+th, td {
+  text-align: right;
+  padding: 0.52rem 0.7rem;
+  border-bottom: 1px solid var(--rule);
+  font-variant-numeric: tabular-nums;
+}
+
+th:first-child, td:first-child { text-align: left; font-variant-numeric: normal; }
+
+thead th {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--annot);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+tbody tr[data-role="control"] td,
+tbody tr[data-role="ceiling"] td { color: var(--annot); font-style: italic; }
+
+td.lead { font-weight: 700; }
+
+/* --- callout: the limitation is part of the form, not a footnote ----------------- */
+
+.caution {
+  border: 1px solid var(--basin-res);
+  border-left-width: 4px;
+  padding: 1.2rem 1.4rem;
+  margin: 2rem 0 0;
+  background: rgba(195, 53, 26, 0.07);
+}
+
+.caution h3 { margin-bottom: 0.5rem; }
+.caution p:last-child { margin-bottom: 0; }
+
+/* --- footer ----------------------------------------------------------------------- */
+
+footer {
+  padding: clamp(3rem, 7vw, 5rem) var(--gutter) 4rem
+    calc(var(--spine) + clamp(1.4rem, 4vw, 3.5rem));
+  border-top: 1px solid var(--rule-strong);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.repo-link {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--ink);
+  padding: 0.7rem 1.1rem;
+  text-decoration: none;
+  margin-top: 0.6rem;
+}
+
+.repo-link:hover { background: var(--ink); color: var(--plate); }
+
+.cols { display: grid; gap: 2rem 3rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+
+/* --- motion ----------------------------------------------------------------------- */
+
+.reveal { opacity: 0; transform: translateY(12px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@media (max-width: 40rem) {
+  :root { --spine: 1.6rem; }
+  .ledger-row { grid-template-columns: 1fr; gap: 0.5rem; }
+  .plate-no { display: none; }
+}
