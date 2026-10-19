@@ -249,14 +249,21 @@ def _verdict(df: pd.DataFrame) -> dict:
     # is a statement about the regime, not evidence against H3, so it is recorded rather
     # than reported as a negative result.
     greedy = df[(~df.abstention) & (df.strategy == "greedy")]
-    # "Saturated" means the remaining headroom is too small for any penalty to act on, not
-    # that it is bit-identical. Regret below 1% of the oracle value leaves nothing to
-    # measure: a penalty cannot recover 0.0001 of reversal in any meaningful sense.
+    # Saturation must be judged at lambda = 0, because that is the baseline H3 proposes to
+    # improve on. Averaging regret across every lambda mixes in the large-lambda runs,
+    # where regret is high precisely *because* the penalty over-corrected, and so hides the
+    # fact that the uncertainty-blind search had no headroom to begin with. Regret below 1%
+    # of the oracle leaves nothing for a penalty to recover.
+    blind_greedy = greedy[greedy["lambda"] == 0]
+    blind_regret = float(blind_greedy.regret_vs_oracle.mean()) if len(blind_greedy) else float("nan")
     mean_regret = float(greedy.regret_vs_oracle.mean()) if len(greedy) else float("nan")
     mean_oracle = float(greedy.oracle_value.mean()) if len(greedy) else float("nan")
     saturated = bool(
-        len(greedy) > 0 and np.isfinite(mean_regret) and mean_regret <= 0.01 * max(mean_oracle, 1e-9)
+        len(blind_greedy) > 0
+        and np.isfinite(blind_regret)
+        and blind_regret <= 0.01 * max(mean_oracle, 1e-9)
     )
+    out["blind_regret_vs_oracle"] = blind_regret
     out["search_saturated_at_oracle"] = saturated
     out["saturation_threshold"] = 0.01 * mean_oracle if np.isfinite(mean_oracle) else None
     out["mean_regret_vs_oracle"] = mean_regret

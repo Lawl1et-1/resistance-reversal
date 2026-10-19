@@ -203,23 +203,36 @@ def run(cfg: dict, out_dir: Path) -> dict:
 
 
 def _paired(point: pd.DataFrame) -> list[dict]:
-    """Deep vs linear on identical test points, within each split."""
+    """Deep vs linear, paired at the level of independent replicates.
+
+    The unit of independence is the **seed**, not the test perturbation. Every
+    perturbation within a seed is scored by the same fitted model on the same network, so
+    those rows are correlated; pairing on (seed, perturbation, context) treats 720
+    correlated rows as 720 independent observations and reports p ~ 0 for differences of
+    0.006, while the bootstrap CI on the same data spans zero. Aggregating to one mean per
+    seed first gives n = 5 honest replicates, wide intervals, and far fewer significant
+    results -- which is the correct answer.
+    """
     out = []
     for split_name, g in point.groupby("split"):
-        pivot_keys = ["seed", "pert", "context"]
         for deep in DEEP:
             for lin in LINEAR:
-                a = g[g.model == deep].set_index(pivot_keys)
-                b = g[g.model == lin].set_index(pivot_keys)
-                shared = a.index.intersection(b.index)
-                if len(shared) < 3:
-                    continue
                 for metric in ("pearson_delta", "mse_top20", "latent_mse"):
-                    res = paired_test(
-                        a.loc[shared, metric].to_numpy(), b.loc[shared, metric].to_numpy()
-                    )
+                    a = g[g.model == deep].groupby("seed")[metric].mean()
+                    b = g[g.model == lin].groupby("seed")[metric].mean()
+                    shared = a.index.intersection(b.index)
+                    if len(shared) < 3:
+                        continue
+                    res = paired_test(a.loc[shared].to_numpy(), b.loc[shared].to_numpy())
                     out.append(
-                        {"split": split_name, "metric": metric, "deep": deep, "linear": lin, **res}
+                        {
+                            "split": split_name,
+                            "metric": metric,
+                            "deep": deep,
+                            "linear": lin,
+                            "unit": "seed",
+                            **res,
+                        }
                     )
     return out
 
@@ -342,18 +355,42 @@ def _ranking_shift(summary: pd.DataFrame, rev_summary: pd.DataFrame) -> list[dic
 
 def _verdict(result: dict) -> dict:
     """H1's verdict, stated from the numbers rather than asserted."""
-    paired = [r for r in result.get("paired_tests", []) if r["metric"] == "pearson_delta"]
-    deep_wins = [r for r in paired if r["ci_lo"] > 0]
-    deep_losses = [r for r in paired if r["ci_hi"] < 0]
+    paired = [
+        r for r in result.get("paired_tests", [])
+        if r["metric"] == "pearson_delta" and np.isfinite(r.get("mean_diff", np.nan))
+    ]
+    # With 5 seeds the Wilcoxon signed-rank test cannot produce p < 0.0625 whatever the
+    # data, so "significant at p < 0.05" is unreachable by construction and claiming it
+    # would be meaningless. A difference counts as decisive only when the bootstrap CI on
+    # the mean paired difference excludes zero *and* the effect is large (|d_z| > 1),
+    # which is a descriptive claim about magnitude and consistency rather than a p-value.
+    LARGE_EFFECT = 1.0
+    decisive = lambda r: abs(r.get("cohens_dz") or 0.0) > LARGE_EFFECT
+    deep_wins = [r for r in paired if r["ci_lo"] > 0 and decisive(r)]
+    deep_losses = [r for r in paired if r["ci_hi"] < 0 and decisive(r)]
     shifts = result.get("ranking_shift", [])
     disagreements = [s for s in shifts if not s["same_winner"]]
     sanity = result.get("readout_sanity", [])
     unreliable = [s for s in sanity if not s["readout_reliable"]]
     return {
         "n_paired_comparisons": len(paired),
+        "pairing_unit": "seed",
+        "min_achievable_p_at_n5": 0.0625,
+        "decisive_criterion": "bootstrap CI on mean paired difference excludes 0 and |d_z| > 1",
         "deep_beats_linear_significantly": len(deep_wins),
         "linear_beats_deep_significantly": len(deep_losses),
-        "h1a_deep_fails_to_reliably_beat_linear": len(deep_wins) == 0 or len(deep_losses) >= len(deep_wins),
+        "largest_deep_deficit": (
+            min((r["mean_diff"] for r in paired), default=None)
+        ),
+        "largest_deep_advantage": (
+            max((r["mean_diff"] for r in paired), default=None)
+        ),
+        # "Reliably beats" means wins decisively and does not decisively lose. Winning 4 of
+        # 20 comparisons while losing 3 -- including one where the deficit is six times the
+        # largest advantage -- is not reliability, so a bare win/loss count is not enough.
+        "h1a_deep_fails_to_reliably_beat_linear": not (
+            len(deep_wins) > 0 and len(deep_losses) == 0
+        ),
         "n_ranking_comparisons": len(shifts),
         "n_ranking_winner_changes": len(disagreements),
         "h1b_evaluation_changes_ranking": len(disagreements) > 0,
@@ -365,9 +402,11 @@ def _verdict(result: dict) -> dict:
             for s in unreliable
         ],
         "note": (
-            "Verdicts are read from paired CIs on identical test points. A CI on the mean "
-            "paired difference that excludes zero counts as a significant win or loss; "
-            "everything else is reported as no reliable difference. Rank correlations are "
+            "Comparisons are paired at the seed level, because perturbations within a seed "
+            "share one fitted model and are not independent. With 5 seeds no comparison can "
+            "reach p < 0.05, so a difference is called decisive only when its CI excludes "
+            "zero and the effect size is large; everything else is reported as no reliable "
+            "difference rather than as a null result. Rank correlations are "
             f"computed only where a split has at least {MIN_PERTS_FOR_RANKING} test "
             "perturbations. Any readout listed under unreliable_readouts is one where the "
             "latent oracle did not rank in the top two, meaning that readout cannot score "

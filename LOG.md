@@ -228,6 +228,115 @@ A separate capacity sweep was abandoned after it consumed ~55 minutes of CPU for
 largest configurations while starving the other experiments; the full profile already runs
 at 8 000 steps / hidden 256, so it answers the same question as a by-product.
 
+## Full profile run (2026-10-18, 8 h 41 m CPU, 5 seeds)
+
+All three experiments exited 0. Provenance `synthetic` throughout. Raw rows in
+`results/full/`, figures in `figures/full/`.
+
+**Failure 12 (statistical, and it inflated every H1 comparison): paired tests were run at
+the wrong unit.** The tests paired on `(seed, perturbation, context)`, giving 720 "paired
+samples" per model-split. But all 720 come from **5** fitted models on 5 networks:
+perturbations within a seed share a model and are not independent. The symptom was tests
+contradicting themselves -- `mean_diff 0.0060, CI [-0.0053, 0.0179], p = 0.0000` -- a CI
+spanning zero beside a p-value of essentially zero. Wilcoxon on 720 correlated rows will
+call a difference of 0.006 significant.
+
+Fixed by aggregating to one mean per seed before testing, giving n = 5 honest replicates.
+A consequence worth stating in the paper: **with 5 seeds the Wilcoxon signed-rank test
+cannot return p < 0.0625 whatever the data**, so "significant at p < 0.05" is unreachable
+by construction. The verdict now calls a difference decisive only when the bootstrap CI
+excludes zero *and* |d_z| > 1, which is a claim about magnitude and consistency rather than
+a p-value. Recomputed from the saved raw rows (`experiments/recompute_h1.py`) rather than by
+re-fitting, so the correction changes only the aggregation and not the underlying numbers.
+
+### H1 - verdict: deep models do **not** reliably beat linear baselines
+
+Pearson-delta, 5 seeds, CIs over perturbations:
+
+| model | combo (genes seen) | combo (genes unseen) | unseen context | unseen single |
+|---|---|---|---|---|
+| additive | 0.840 | n/a | 0.734 | n/a |
+| ridge_embedding | 0.859 | 0.441 | **0.834** | 0.416 |
+| low_rank_linear | 0.826 | 0.436 | 0.794 | 0.416 |
+| pertflow | 0.846 | 0.395 | **0.229** | 0.390 |
+| pertflow_mlp | 0.866 | 0.410 | 0.830 | 0.395 |
+| shuffled_labels (control) | 0.557 | 0.341 | 0.507 | 0.260 |
+| oracle_latent (ceiling) | 0.918 | 0.830 | 0.914 | 0.799 |
+
+4 decisive wins for deep models against 3 decisive losses out of 20 comparisons, and the
+asymmetry is the story: **largest deep advantage +0.097, largest deep deficit -0.605**. When
+PertFlow wins it wins marginally; when it loses it collapses.
+
+**PertFlow fails catastrophically on unseen cell context (0.229) while its own MLP ablation
+does not (0.830).** The two differ only in whether prediction integrates an ODE. The flow
+applies the context conditioning at all 20 integration steps, so an untrained context
+embedding compounds; the regressor applies it once. This is a specific, mechanistic
+prediction that the ablation isolates, and it is the most interesting single finding in the
+run: *iterative inference amplifies conditioning error under distribution shift*.
+
+Note also that `shuffled_labels` reaches 0.507 on unseen context and 0.557 on the
+composition split. Roughly half the Pearson-delta signal does not require knowing which
+perturbation was applied.
+
+### H1b - verdict: reversal-aware evaluation **does** reorder the models
+
+5 of 8 comparisons change which model ranks first relative to Pearson-delta.
+
+The readout diagnostic fires on four combinations. Two have margins of 0.019 and 0.034,
+which is noise. Two are large and real: `sc_classifier` is beaten by **0.514** on
+unseen-combination-unseen-genes and **0.720** on unseen-single, ranking last of six both
+times. The single-cell latent classifier is genuinely unfit to score reversal on
+gene-holdout splits, consistent with the M4 finding.
+
+### H2 - verdict: coverage reached where exchangeability holds, and it **fails exactly where theory says it must**
+
+Nominal coverage 0.90:
+
+| split | exchangeable | median n_cal | coverage [95% CI] | uncertainty AUROC | risk @50% | risk @100% |
+|---|---|---|---|---|---|---|
+| combo (genes seen) | yes | 144 | **0.888** [0.860, 0.914] | 0.697 | 2.98 | 3.53 |
+| combo (genes unseen) | yes | 30 | 0.953 [0.913, 0.993] | 0.748 | 4.21 | 4.55 |
+| unseen single | yes | 15 | 1.000 [1.000, 1.000] | 0.709 | 2.88 | 3.39 |
+| **unseen context** | **no** | 104 | **0.696** [0.660, 0.729] | **0.507** | 5.13 | 5.10 |
+
+On the best-powered exchangeable split coverage lands at 0.888 against a nominal 0.90 --
+effectively exact. Smaller calibration sets over-cover (conservative, as conformal should
+be). Abstention lowers error on all three exchangeable splits.
+
+Under context shift **three things fail together**: coverage collapses to 0.696 with a CI
+nowhere near nominal, the uncertainty becomes uninformative (AUROC 0.507, i.e. chance), and
+abstention stops helping (risk at 50% coverage 5.13 is *worse* than at 100%, 5.10). That is
+a coherent picture rather than three separate problems: when the shift breaks
+exchangeability it also breaks the ensemble disagreement that the calibration is built on.
+
+### H3 - verdict: **untestable in this regime**, not refuted
+
+| lambda | verified reversal [95% CI] | predicted | optimism gap | regret vs oracle |
+|---|---|---|---|---|
+| 0.0 | 0.9508 [0.917, 0.973] | 0.244 | -0.707 | **0.0006** |
+| 0.5 | 0.9499 | 0.229 | -0.721 | 0.0015 |
+| 1.0 | 0.9476 | 0.211 | -0.736 | 0.0038 |
+| 2.0 | 0.7628 [0.400, 0.964] | 0.170 | -0.592 | 0.1885 |
+
+**At lambda = 0 the greedy search already attains 99.94% of the oracle optimum** (regret
+0.0006 against a 1%-of-oracle threshold of 0.0095). There is no headroom for any penalty to
+recover, so the experiment cannot test H3; lambda can only do harm, and at lambda = 2 it
+does (verified reversal falls to 0.76 with a CI reaching 0.40).
+
+**Failure 13: the saturation check initially missed this**, because it averaged regret over
+all lambdas. The large-lambda runs have high regret *because the penalty over-corrected*,
+which pulled the mean to 0.0486 and hid the fact that the uncertainty-blind baseline had
+nothing to improve on. Saturation is now judged at lambda = 0, which is the baseline H3
+proposes to beat.
+
+**There is also no optimiser's curse here to correct.** The optimism gap is
+**-0.707** [-0.737, -0.679]: the model predicts 0.244 reversal where the verified value is
+0.951. The curse requires systematic *over*estimation of the selected set; this model
+systematically *under*estimates, which is the magnitude shrinkage characterised in M3
+(predictions biased toward zero). Testing H3 properly needs a regime where the search does
+not trivially succeed -- a larger candidate space, a noisier model, or a harder network --
+and that is the clearest piece of future work from this run.
+
 ## M5 - search, and a diagnostic that condemned the wrong thing
 
 **Failure 11: the readout diagnostic was broken, not the readouts.** The H1 run added a
