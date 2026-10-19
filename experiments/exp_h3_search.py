@@ -126,6 +126,21 @@ def run(cfg: dict, out_dir: Path) -> dict:
         spreads = calibration_spreads(setup, split_name, model)
         threshold = abstention_threshold(spreads, keep_frac=0.9)
 
+        # Observed outcome of a set, scored through the *same* learned readout the model's
+        # prediction passes through. This is the only quantity a predicted reversal can be
+        # honestly differenced against; `truth_fn` is on the simulator's true_sensitivity
+        # scale and is used for ranking and regret, where only ordering matters.
+        readout = setup.sensitivity[split_name].secondary
+        baseline_same = float(np.mean(readout(resistant_control_latents(setup, split_name))))
+        observed_cache: dict[tuple, float] = {}
+
+        def observed_same_readout(pert: tuple) -> float:
+            key = tuple(sorted(pert))
+            if key not in observed_cache:
+                z = resistant_control_latents(setup, split_name, pert=key)
+                observed_cache[key] = float(np.mean(readout(z))) - baseline_same
+            return observed_cache[key]
+
         use_exhaustive = n_sets(len(atoms), k) <= EXHAUSTIVE_MAX_SETS
         if not use_exhaustive:
             notes.append(
@@ -161,7 +176,9 @@ def run(cfg: dict, out_dir: Path) -> dict:
                         "selected_size": len(sel),
                         "reversal_pred": rec["reversal"],
                         "reversal_verified": verified,
-                        "optimism_gap": rec["reversal"] - verified,
+                        "reversal_observed_same_readout": observed_same_readout(sel),
+                        "optimism_gap": rec["reversal"] - observed_same_readout(sel),
+                        "scale_gap_readout_vs_oracle": observed_same_readout(sel) - verified,
                         "uncertainty": rec["uncertainty"],
                         "oracle_best": pert_label(oracle_best),
                         "oracle_value": oracle_value,
@@ -185,7 +202,9 @@ def run(cfg: dict, out_dir: Path) -> dict:
                     "seed": seed, "split": split_name, "lambda": lam, "strategy": "greedy",
                     "abstention": True, "selected": pert_label(sel), "selected_size": len(sel),
                     "reversal_pred": rec["reversal"], "reversal_verified": verified,
-                    "optimism_gap": rec["reversal"] - verified,
+                    "reversal_observed_same_readout": observed_same_readout(sel),
+                    "optimism_gap": rec["reversal"] - observed_same_readout(sel),
+                    "scale_gap_readout_vs_oracle": observed_same_readout(sel) - verified,
                     "uncertainty": rec["uncertainty"], "oracle_best": pert_label(oracle_best),
                     "oracle_value": oracle_value, "regret_vs_oracle": oracle_value - verified,
                     "regret_vs_reference": float("nan"), "n_evaluations": res.n_evaluations,
@@ -215,6 +234,7 @@ def _summarise(df: pd.DataFrame) -> list[dict]:
     for (lam, strategy, abst), g in df.groupby(["lambda", "strategy", "abstention"]):
         row = {"lambda": lam, "strategy": strategy, "abstention": bool(abst), "n_seeds": len(g)}
         for col in ("reversal_verified", "reversal_pred", "optimism_gap",
+                    "reversal_observed_same_readout", "scale_gap_readout_vs_oracle",
                     "regret_vs_oracle", "regret_vs_reference", "top5_mean_verified",
                     "n_evaluations"):
             point, lo, hi = bootstrap_ci(g[col].to_numpy())

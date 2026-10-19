@@ -143,17 +143,27 @@ def build(cfg: dict, seed: int, save_split_dir: Path | None = None) -> Setup:
     return setup
 
 
-def resistant_control_latents(setup: Setup, split_name: str, n_cells: int = 256) -> np.ndarray:
-    """A fresh resistant control population to search from.
+def resistant_control_latents(
+    setup: Setup, split_name: str, n_cells: int = 256, pert: tuple = ()
+) -> np.ndarray:
+    """A fresh resistant population, optionally with `pert` applied.
 
     Drawn with its own rng so the search starting point is not the same cells the model was
-    fitted on, which would flatter the reversal estimate.
+    fitted on, which would flatter the reversal estimate. The rng is seeded identically
+    whatever `pert` is, so the perturbed and control populations start from the same cells
+    and their difference is paired.
+
+    With `pert` set this gives the *actually observed* outcome of an intervention, which is
+    what the predicted outcome has to be compared against to measure optimism. Comparing a
+    prediction made through the learned readout against the simulator's own
+    `true_sensitivity` subtracts two different scales and the difference is meaningless.
     """
     grn, encoder = setup.grn, setup.encoders[split_name]
     rng = np.random.default_rng(50_000 + setup.seed)
     state = simulate(
         grn,
         seed_state(grn, "resistant", n_cells, rng),
+        pert,
         rng=rng,
         cell_bias=sample_cell_bias(grn, n_cells, rng),
     )

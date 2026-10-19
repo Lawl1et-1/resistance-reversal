@@ -1,0 +1,113 @@
+{
+  "provenance": "synthetic",
+  "profile": "smoke",
+  "config_path": "configs/smoke.yaml",
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.2.4",
+    "torch": "2.11.0+cu126",
+    "cuda_available": false,
+    "git_commit": "54a0e06"
+  },
+  "result": {
+    "per_run": [
+      {
+        "seed": 0,
+        "model": "ridge_embedding",
+        "train_steps": NaN,
+        "flow_steps": NaN,
+        "pearson_delta": 0.7294495915863106
+      },
+      {
+        "seed": 0,
+        "model": "pertflow_mlp",
+        "train_steps": 400.0,
+        "flow_steps": NaN,
+        "pearson_delta": 0.6551732955944415
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 1.0,
+        "pearson_delta": 0.753776351512059
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 2.0,
+        "pearson_delta": 0.720333670171592
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 5.0,
+        "pearson_delta": 0.6455261086948227
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 10.0,
+        "pearson_delta": 0.6139834035073537
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 400.0,
+        "flow_steps": 20.0,
+        "pearson_delta": 0.5974345525236682
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 1.0,
+        "pearson_delta": 0.49949563912438105
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 2.0,
+        "pearson_delta": 0.6285583767630912
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 5.0,
+        "pearson_delta": 0.6122792443673968
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 10.0,
+        "pearson_delta": 0.5961913849074878
+      },
+      {
+        "seed": 0,
+        "model": "pertflow",
+        "train_steps": 1200.0,
+        "flow_steps": 20.0,
+        "pearson_delta": 0.5877014044057911
+      }
+    ],
+    "verdict": {
+      "ridge": 0.7294495915863106,
+      "mlp_reference": 0.6551732955944415,
+      "flow_at_1_step": 0.753776351512059,
+      "flow_at_max_steps": 0.5974345525236682,
+      "flow_trained_1200_at_max_steps": 0.5877014044057911,
+      "fraction_of_gap_recovered_by_fewer_integration_steps": 2.707745106206326,
+      "fraction_of_gap_recovered_by_longer_training": -0.1685722203191478,
+      "compounding_supported": true,
+      "undertraining_supported": false,
+      "note": "Gap is measured against the MLP ablation, which shares the architecture and differs only in integrating an ODE. A fraction near 1 means that explanation accounts for the collapse; near 0 means it does not."
+    }
+  }
+}
