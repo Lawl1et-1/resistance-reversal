@@ -225,4 +225,3 @@ leakage tests cannot pass vacuously.
 - `LOG.md` — decisions and, at length, the failures and what they changed
 - `DATA.md` — provenance; currently records that no real data has been acquired
 - `MODEL_CARD.md` — intended use, and what this must not be used for
-- `STUDENT_GUIDE.md` — the methods in plain language, with reviewer questions and answers
