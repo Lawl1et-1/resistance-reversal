@@ -11,8 +11,29 @@ const RES_FIELD = '#e3a699';
 const SEN_FIELD = '#a9b9d4';
 const RULE = 'rgba(13,17,22,0.26)';
 
-const fmt = (v, d = 3) => (v === null || v === undefined || Number.isNaN(v) ? 'n/a' : v.toFixed(d));
-const pct = (v) => (v === null || v === undefined ? '—' : `${(v * 100).toFixed(1)}%`);
+/* --- language ------------------------------------------------------------------
+   English lives in index.html; French comes from i18n.fr.js keyed by data-i18n.
+   Switching re-renders everything generated, because the charts, tables and ledger
+   build their own text. */
+let LANG = (() => {
+  try { return localStorage.getItem('lang') || 'en'; } catch { return 'en'; }
+})();
+const FR = () => (window.FR || { html: {}, ui: {} });
+const isFR = () => LANG === 'fr';
+const T = () => (isFR() ? FR().ui : null);
+const splitLabel = (d, key) => (isFR() && FR().ui.splits[key]) || d.splits[key] || key;
+const modelLabel = (m) => (isFR() && FR().ui.models[m.model]) || m.label;
+
+const fmt = (v, d = 3) => {
+  if (v === null || v === undefined || Number.isNaN(v)) return isFR() ? 's.o.' : 'n/a';
+  const s = v.toFixed(d);
+  return isFR() ? s.replace('.', ',') : s;
+};
+const pct = (v) => {
+  if (v === null || v === undefined) return '—';
+  const s = (v * 100).toFixed(1);
+  return isFR() ? `${s.replace('.', ',')} %` : `${s}%`;
+};
 
 /* ---------------------------------------------------------------- phase dynamics ---
    The simulator's toggle switch, reduced to its two master regulators:
@@ -233,9 +254,12 @@ if (inter) {
     const b = document.createElement('button');
     b.className = 'knock';
     b.type = 'button';
-    b.textContent = r.label;
+    b.textContent = isFR() ? FR().ui.kdLabel(r.id) : r.label;
+    b.dataset.reg = r.id;
     b.setAttribute('aria-pressed', 'false');
-    b.title = r.drives === 'res' ? 'Resistance driver' : 'Sensitivity driver';
+    b.title = isFR()
+      ? (r.drives === 'res' ? FR().ui.kdResistance : FR().ui.kdSensitivity)
+      : (r.drives === 'res' ? 'Resistance driver' : 'Sensitivity driver');
     b.addEventListener('click', () => {
       knocked.has(r.id) ? knocked.delete(r.id) : knocked.add(r.id);
       b.setAttribute('aria-pressed', String(knocked.has(r.id)));
@@ -295,20 +319,23 @@ function coverageChart(root, data) {
     const v = el('text', { x: x + w / 2, y: top - 9, 'text-anchor': 'middle', class: 'bar-label' }, s);
     v.textContent = pct(r.coverage);
 
-    r.label.split(/,\s*/).forEach((line, k) => {
+    const covLabel = (isFR() && FR().ui.splits[r.split]) || r.label;
+    covLabel.split(/,\s*/).forEach((line, k) => {
       const t = el('text', { x: x + w / 2, y: y(0) + 18 + k * 12, 'text-anchor': 'middle' }, s);
       t.textContent = line;
     });
     if (!r.exchangeable) {
       const t = el('text', { x: x + w / 2, y: y(0) + 18 + 24, 'text-anchor': 'middle', fill: RES }, s);
-      t.textContent = 'assumption violated';
+      t.textContent = isFR() ? FR().ui.assumptionViolated : 'assumption violated';
     }
   });
 
   const nom = data.verdicts.h2.nominal;
   el('line', { x1: L, y1: y(nom), x2: W - R, y2: y(nom), class: 'nominal' }, s);
   const nt = el('text', { x: W - R, y: y(nom) - 7, 'text-anchor': 'end', fill: RES }, s);
-  nt.textContent = `nominal ${nom * 100}%`;
+  nt.textContent = isFR()
+    ? `${FR().ui.nominal} ${nom * 100} %`
+    : `nominal ${nom * 100}%`;
   root.appendChild(s);
 }
 
@@ -355,7 +382,7 @@ function accuracyChart(root, data) {
         stroke: INK, 'stroke-width': 1.5, 'stroke-dasharray': '6 3',
       }, s);
     }
-    data.splits[sp].split(/,\s*/).forEach((line, k) => {
+    splitLabel(data, sp).split(/,\s*/).forEach((line, k) => {
       const t = el('text', { x: x0 + gw / 2, y: y(0) + 18 + k * 12, 'text-anchor': 'middle' }, s);
       t.textContent = line;
     });
@@ -369,7 +396,7 @@ function accuracyChart(root, data) {
       fill: isFlow ? RES_FIELD : SEN_FIELD, stroke: isFlow ? RES : SEN,
     }, s);
     const t = el('text', { x: W - R + 25, y: yy + 1 }, s);
-    t.textContent = m.label;
+    t.textContent = modelLabel(m);
   });
   const ly = T + 6 + models.length * 16;
   el('line', {
@@ -377,22 +404,24 @@ function accuracyChart(root, data) {
     stroke: INK, 'stroke-width': 1.5, 'stroke-dasharray': '6 3',
   }, s);
   const lt = el('text', { x: W - R + 25, y: ly + 1 }, s);
-  lt.textContent = 'shuffled control';
+  lt.textContent = isFR() ? FR().ui.shuffledControl : 'shuffled control';
   root.appendChild(s);
 }
 
 function accuracyTable(root, data) {
   const splits = Object.keys(data.splits);
   const t = document.createElement('table');
-  t.innerHTML = `<caption>Pearson-delta by split · 5 seeds · hierarchical 95% intervals</caption>
-    <thead><tr><th>Model</th>${splits.map((s) => `<th>${data.splits[s]}</th>`).join('')}</tr></thead>`;
+  const cap = isFR() ? FR().ui.accCaption : 'Pearson-delta by split · 5 seeds · hierarchical 95% intervals';
+  const colModel = isFR() ? FR().ui.colModel : 'Model';
+  t.innerHTML = `<caption>${cap}</caption>
+    <thead><tr><th>${colModel}</th>${splits.map((s) => `<th>${splitLabel(data, s)}</th>`).join('')}</tr></thead>`;
   const tb = document.createElement('tbody');
   data.accuracy.forEach((m) => {
     const tr = document.createElement('tr');
     tr.dataset.role = m.role;
-    tr.innerHTML = `<td>${m.label}</td>` + splits.map((s) => {
+    tr.innerHTML = `<td>${modelLabel(m)}</td>` + splits.map((s) => {
       const c = m.by_split[s];
-      if (!c || c.value == null) return '<td>n/a</td>';
+      if (!c || c.value == null) return `<td>${isFR() ? FR().ui.na : 'n/a'}</td>`;
       const lead = (m.model === 'pertflow' && s === 'unseen_context') ? ' class="lead"' : '';
       return `<td${lead}>${fmt(c.value)}</td>`;
     }).join('');
@@ -404,8 +433,9 @@ function accuracyTable(root, data) {
 
 function searchTable(root, data) {
   const t = document.createElement('table');
-  t.innerHTML = `<caption>Intervention search · greedy · verified against the simulator oracle</caption>
-    <thead><tr><th>Uncertainty penalty λ</th><th>Verified reversal</th><th>95% interval</th><th>Regret vs best possible</th></tr></thead>`;
+  const u = isFR() ? FR().ui : null;
+  t.innerHTML = `<caption>${u ? u.searchCaption : 'Intervention search · greedy · verified against the simulator oracle'}</caption>
+    <thead><tr><th>${u ? u.colLambda : 'Uncertainty penalty λ'}</th><th>${u ? u.colVerified : 'Verified reversal'}</th><th>${u ? u.colInterval : '95% interval'}</th><th>${u ? u.colRegret : 'Regret vs best possible'}</th></tr></thead>`;
   const tb = document.createElement('tbody');
   data.search.forEach((r) => {
     const tr = document.createElement('tr');
@@ -466,6 +496,14 @@ function ledger(root, data) {
       why: 'Not run. H5 needs real data, which this project never acquired.',
     },
   ];
+  if (isFR()) {
+    const L = FR().ui.ledger;
+    rows[0].claim = L.h1a.claim; rows[0].why = L.h1a.why(v.h1a);
+    rows[1].claim = L.h1b.claim; rows[1].why = L.h1b.why(v.h1b);
+    rows[2].claim = L.h2.claim;  rows[2].why = L.h2.why(v.h2);
+    rows[3].claim = L.h3.claim;  rows[3].why = L.h3.why(v.h3, pct);
+    rows[4].claim = L.h45.claim; rows[4].why = L.h45.why();
+  }
   rows.forEach((r) => {
     const dt = document.createElement('dt');
     dt.textContent = r.id;
@@ -475,7 +513,7 @@ function ledger(root, data) {
     st.className = 'state';
     st.appendChild(stateMark(r.kind));
     const lab = document.createElement('span');
-    lab.textContent = r.kind;
+    lab.textContent = isFR() ? FR().ui.states[r.kind] : r.kind;
     st.appendChild(lab);
     const row = document.createElement('div');
     row.className = 'ledger-row';
@@ -511,9 +549,10 @@ function bind(data) {
   }
   const prov = document.getElementById('provenance-line');
   if (prov) {
-    prov.textContent =
-      `${data.meta.provenance} data · ${data.meta.seeds} seeds · generated from ${data.meta.generated_from}`
-      + (data.meta.git_commit ? ` · commit ${data.meta.git_commit}` : '');
+    prov.textContent = isFR()
+      ? FR().ui.provenance(data.meta.provenance, data.meta.seeds, data.meta.generated_from, data.meta.git_commit)
+      : `${data.meta.provenance} data · ${data.meta.seeds} seeds · generated from ${data.meta.generated_from}`
+        + (data.meta.git_commit ? ` · commit ${data.meta.git_commit}` : '');
   }
 }
 
@@ -529,6 +568,48 @@ function reveal() {
   document.querySelectorAll('.reveal').forEach((n) => io.observe(n));
 }
 
+/* Everything the charts, tables and ledger draw is regenerated on a language switch,
+   because each builds its own text rather than reading it from the document. */
+function renderGenerated(data) {
+  ['chart-coverage', 'chart-accuracy', 'table-accuracy', 'table-search', 'ledger']
+    .forEach((id) => { const n = document.getElementById(id); if (n) n.innerHTML = ''; });
+  bind(data);
+  coverageChart(document.getElementById('chart-coverage'), data);
+  accuracyChart(document.getElementById('chart-accuracy'), data);
+  accuracyTable(document.getElementById('table-accuracy'), data);
+  searchTable(document.getElementById('table-search'), data);
+  ledger(document.getElementById('ledger'), data);
+}
+
+/* The English copy stays in the document and is stashed on first switch, so returning
+   to English restores the original markup rather than a re-translation of it. */
+function applyLang(data) {
+  const fr = isFR();
+  document.documentElement.lang = fr ? 'fr' : 'en';
+  document.querySelectorAll('[data-i18n]').forEach((n) => {
+    if (n.dataset.en === undefined) n.dataset.en = n.innerHTML;
+    const val = fr ? (FR().html[n.dataset.i18n] ?? n.dataset.en) : n.dataset.en;
+    n.innerHTML = val;
+  });
+  if (document.documentElement.dataset.titleEn === undefined) {
+    document.documentElement.dataset.titleEn = document.title;
+  }
+  document.title = fr ? (FR().title || document.title) : document.documentElement.dataset.titleEn;
+  const btn = document.getElementById('lang-toggle');
+  if (btn) {
+    btn.textContent = fr ? 'EN' : 'FR';
+    btn.setAttribute('aria-label', fr ? 'Switch to English' : 'Passer en français');
+  }
+  document.querySelectorAll('#knockdowns .knock').forEach((b) => {
+    const r = REGULATORS.find((x) => x.id === b.dataset.reg);
+    if (!r) return;
+    b.textContent = fr ? FR().ui.kdLabel(r.id) : r.label;
+    b.title = fr ? (r.drives === 'res' ? FR().ui.kdResistance : FR().ui.kdSensitivity)
+                 : (r.drives === 'res' ? 'Resistance driver' : 'Sensitivity driver');
+  });
+  if (data) renderGenerated(data);
+}
+
 async function boot() {
   sizeHero();
   redrawInteractive();
@@ -539,12 +620,15 @@ async function boot() {
     console.error('could not load data.json', err);
     return;
   }
-  bind(data);
-  coverageChart(document.getElementById('chart-coverage'), data);
-  accuracyChart(document.getElementById('chart-accuracy'), data);
-  accuracyTable(document.getElementById('table-accuracy'), data);
-  searchTable(document.getElementById('table-search'), data);
-  ledger(document.getElementById('ledger'), data);
+  applyLang(data);
+  const btn = document.getElementById('lang-toggle');
+  if (btn) {
+    btn.addEventListener('click', () => {
+      LANG = isFR() ? 'en' : 'fr';
+      try { localStorage.setItem('lang', LANG); } catch { /* private mode */ }
+      applyLang(data);
+    });
+  }
   document.querySelectorAll('section .wrap > *').forEach((n, i) => {
     if (i % 1 === 0) n.classList.add('reveal');
   });

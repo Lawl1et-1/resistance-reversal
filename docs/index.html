@@ -35,6 +35,7 @@ over the roll's assignment (pharmaceutical insert); seed key de966764.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
 -->
 <div class="spine" aria-hidden="true"></div>
+<button id="lang-toggle" class="lang-toggle" type="button" aria-label="Passer en français">FR</button>
 
 <main>
 
@@ -42,16 +43,16 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <canvas id="phase-hero" aria-hidden="true"></canvas>
   <span class="plate-no hero-no">PL. 0</span>
   <div class="wrap hero-title">
-    <h1>Reversing resistance in silico</h1>
-    <p class="lede">A drug-resistant cell and a drug-sensitive one are two stable states of
+    <h1 data-i18n="hero.h1">Reversing resistance in silico</h1>
+    <p data-i18n="hero.lede" class="lede">A drug-resistant cell and a drug-sensitive one are two stable states of
       the same system. This work learns how perturbations move a cell between them, searches
       for interventions that would cross the boundary — and calibrates when the model should
       not be believed.</p>
     <div class="basin-key">
-      <span><i class="key-res"></i> resistant basin</span>
-      <span><i class="key-sen"></i> sensitive basin</span>
-      <span>separatrix</span>
-      <span class="key-note">synthetic simulator · in silico only · not peer reviewed</span>
+      <span data-i18n="key.res"><i class="key-res"></i> resistant basin</span>
+      <span data-i18n="key.sen"><i class="key-sen"></i> sensitive basin</span>
+      <span data-i18n="key.sep">separatrix</span>
+      <span data-i18n="key.note" class="key-note">synthetic simulator · in silico only · not peer reviewed</span>
     </div>
   </div>
 </section>
@@ -59,13 +60,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">I</span>
   <div class="wrap">
-    <span class="annot">Plate I · the mechanism</span>
-    <h2>Reversal is a basin crossing</h2>
+    <span data-i18n="p1.annot" class="annot">Plate I · the mechanism</span>
+    <h2 data-i18n="p1.h2">Reversal is a basin crossing</h2>
     <div class="measure">
-      <p>The simulator is a toggle switch: two master regulators, each activating itself and
+      <p data-i18n="p1.a">The simulator is a toggle switch: two master regulators, each activating itself and
         repressing the other. That gives two stable states with a boundary between them. A
         perturbation does not nudge expression. It moves the boundary, and the cell falls into whichever basin it then finds itself in.</p>
-      <p>Below is that system, integrated live from the model's own equations. Drag the cell.
+      <p data-i18n="p1.b">Below is that system, integrated live from the model's own equations. Drag the cell.
         Knock down a regulator and watch the separatrix move.</p>
     </div>
 
@@ -74,7 +75,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         aria-label="Interactive phase portrait. Drag the cell marker to set its starting state; toggle gene knockdowns to move the separatrix."
         role="img" tabindex="0"></canvas>
       <div class="controls" id="knockdowns" role="group" aria-label="Gene knockdowns"></div>
-      <figcaption class="plate-caption">
+      <figcaption data-i18n="p1.cap" class="plate-caption">
         Horizontal axis: resistance master regulator. Vertical: sensitive master regulator.
         Filled circles are stable fixed points; the open circle is the unstable point on the
         separatrix. The trajectory is Euler-integrated from the same update rule used in the
@@ -87,19 +88,19 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">II</span>
   <div class="wrap">
-    <span class="annot">Plate II · finding one</span>
-    <h2>Calibration holds — then fails at the boundary, all at once</h2>
+    <span data-i18n="p2.annot" class="annot">Plate II · finding one</span>
+    <h2 data-i18n="p2.h2">Calibration holds — then fails at the boundary, all at once</h2>
     <div class="measure">
-      <p>The model carries conformal prediction intervals, which promise to contain the truth
+      <p data-i18n="p2.a">The model carries conformal prediction intervals, which promise to contain the truth
         <span class="num" data-field="nominalPct">90</span>% of the time. On held-out
         perturbations they do, almost exactly:
         <span class="num" data-field="bestCoverage">—</span>.</p>
-      <p>Move to a <strong>cell context the model never saw</strong> and three things fail
+      <p data-i18n="p2.b">Move to a <strong>cell context the model never saw</strong> and three things fail
         together: coverage drops to <span class="num" data-field="shiftedCoverage">—</span>,
         the uncertainty estimate becomes no better than a coin flip at flagging its own
         errors (AUROC <span class="num" data-field="shiftedAuroc">—</span>), and abstaining
         on the least-confident predictions stops helping.</p>
-      <p>This is what conformal theory predicts when its exchangeability assumption breaks,
+      <p data-i18n="p2.c">This is what conformal theory predicts when its exchangeability assumption breaks,
         so it is a <em>confirmation</em>, not a discovery. What is striking is that all three
         safety properties fail at the same boundary: the uncertainty machinery gives no
         warning precisely where it stops working.</p>
@@ -111,14 +112,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">III</span>
   <div class="wrap">
-    <span class="annot">Plate III · finding two</span>
-    <h2>How you measure decides which model wins</h2>
+    <span data-i18n="p3.annot" class="annot">Plate III · finding two</span>
+    <h2 data-i18n="p3.h2">How you measure decides which model wins</h2>
     <div class="measure">
-      <p>Rank the models by the conventional accuracy metric, then by how well they actually
+      <p data-i18n="p3.a">Rank the models by the conventional accuracy metric, then by how well they actually
         rank candidate interventions, and the winner changes in
         <span class="num" data-field="rankChanges">—</span> of
         <span class="num" data-field="rankOf">—</span> comparisons.</p>
-      <p>The dashed line below is a control model fitted on <strong>shuffled</strong>
+      <p data-i18n="p3.b">The dashed line below is a control model fitted on <strong>shuffled</strong>
         perturbation labels, and by construction cannot know which perturbation was applied.
         It still scores around half the conventional metric. Much of what that metric rewards
         does not require knowing the perturbation at all.</p>
@@ -131,19 +132,19 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">IV</span>
   <div class="wrap">
-    <span class="annot">Plate IV · finding three, preliminary</span>
-    <h2>The flow model collapses where its twin does not</h2>
+    <span data-i18n="p4.annot" class="annot">Plate IV · finding three, preliminary</span>
+    <h2 data-i18n="p4.h2">The flow model collapses where its twin does not</h2>
     <div class="measure">
-      <p>On unseen cell contexts the flow model scores
+      <p data-i18n="p4.a">On unseen cell contexts the flow model scores
         <span class="num" data-field="flowContext">—</span>, against
         <span class="num" data-field="ridgeContext">—</span> for ridge regression. An
         otherwise identical model that skips the iterative integration step scores
         <span class="num" data-field="mlpContext">—</span>.</p>
-      <p>The two differ only in whether prediction integrates an ODE across twenty steps. A
+      <p data-i18n="p4.b">The two differ only in whether prediction integrates an ODE across twenty steps. A
         supporting check — reducing the integration budget at inference on fixed weights —
         recovers the loss on the shifted split while leaving an unshifted control flat. That
         points to error compounding across integration under distribution shift.</p>
-      <p><strong>No cause is claimed.</strong> The obvious explanation, an
+      <p data-i18n="p4.c"><strong>No cause is claimed.</strong> The obvious explanation, an
         untrained context embedding, predicts that longer training changes nothing; longer
         training measurably hurt. Supporting evidence exists only at small scale on one seed,
         so this is reported as an observation, not a result.</p>
@@ -154,10 +155,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">V</span>
   <div class="wrap">
-    <span class="annot">Plate V · verdicts</span>
-    <h2>What this work could not conclude</h2>
+    <span data-i18n="p5.annot" class="annot">Plate V · verdicts</span>
+    <h2 data-i18n="p5.h2">What this work could not conclude</h2>
     <div class="measure">
-      <p>Two of the headline questions did not resolve. They are given the same weight here
+      <p data-i18n="p5.a">Two of the headline questions did not resolve. They are given the same weight here
         as the findings, because the honest answer to a question that did not settle is not
         a quieter version of an answer.</p>
     </div>
@@ -168,10 +169,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">VI</span>
   <div class="wrap">
-    <span class="annot">Plate VI · corrections</span>
-    <h2>Claims that did not survive</h2>
+    <span data-i18n="p6.annot" class="annot">Plate VI · corrections</span>
+    <h2 data-i18n="p6.h2">Claims that did not survive</h2>
     <div class="measure">
-      <p>Thirteen defects were found and recorded during the build. Four of them would have
+      <p data-i18n="p6.a">Thirteen defects were found and recorded during the build. Four of them would have
         produced a convincing but false result. These are the claims that were written down
         and then withdrawn. They hang here rather than being deleted, because the corrections
         are the evidence that the surviving numbers were checked.</p>
@@ -264,10 +265,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">VII</span>
   <div class="wrap">
-    <span class="annot">Plate VII · the search</span>
-    <h2>Why the intervention search could not be tested</h2>
+    <span data-i18n="p7.annot" class="annot">Plate VII · the search</span>
+    <h2 data-i18n="p7.h2">Why the intervention search could not be tested</h2>
     <div class="measure">
-      <p>The design was to compare uncertainty-blind search against search that penalises
+      <p data-i18n="p7.a">The design was to compare uncertainty-blind search against search that penalises
         uncertainty, expecting the penalty to help. It cannot be tested here: without any
         penalty the search already finds
         <span class="num" data-field="blindPct">—</span> of the best possible intervention.
@@ -276,8 +277,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
     <div class="table-scroll" id="table-search"></div>
     <div class="caution">
-      <h3>This is a flaw in the experiment, not a result about the idea</h3>
-      <p>A design where the baseline already succeeds cannot discriminate between methods.
+      <h3 data-i18n="p7.cauh">This is a flaw in the experiment, not a result about the idea</h3>
+      <p data-i18n="p7.caup">A design where the baseline already succeeds cannot discriminate between methods.
         Testing it properly needs a harder search problem, a larger candidate space or a
         weaker model, and that regime should be specified in writing before it is run,
         rather than built until the hypothesis appears.</p>
@@ -288,11 +289,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <section>
   <span class="plate-no">VIII</span>
   <div class="wrap">
-    <span class="annot">Plate VIII · limitations</span>
-    <h2>What this is not</h2>
+    <span data-i18n="p8.annot" class="annot">Plate VIII · limitations</span>
+    <h2 data-i18n="p8.h2">What this is not</h2>
     <div class="caution">
-      <h3>No wet-lab validation. No biological or clinical claim.</h3>
-      <p>Every number on this page comes from a simulator written for this project. Its
+      <h3 data-i18n="p8.cauh">No wet-lab validation. No biological or clinical claim.</h3>
+      <p data-i18n="p8.caup">Every number on this page comes from a simulator written for this project. Its
         structure encodes a hypothesis about how resistance states behave; it is not a
         measurement of one. Nothing here has been tested in cells, and the object of study is
         a <em>predicted shift toward a drug-sensitive transcriptional state</em>: not a
@@ -300,7 +301,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         anything living.</p>
     </div>
     <div class="measure">
-      <p style="margin-top:2rem">Further limits worth stating plainly: the sensitivity score
+      <p data-i18n="p8.more" style="margin-top:2rem">Further limits worth stating plainly: the sensitivity score
         is a learned proxy whose two independent readouts disagree sharply on predicted
         post-perturbation states. Only five seeds were run, which cannot reach conventional
         significance under the paired test used, so results are reported as intervals and
@@ -316,29 +317,30 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <div class="cols">
       <div>
-        <span class="annot">Reproducing it</span>
-        <p>Fixed seeds throughout. Every results file records the git commit, config and
+        <span data-i18n="f.repro" class="annot">Reproducing it</span>
+        <p data-i18n="f.reprop">Fixed seeds throughout. Every results file records the git commit, config and
           library versions, and carries a <code>real</code> or <code>synthetic</code>
           provenance tag. The full profile takes about nine hours on CPU.</p>
       </div>
       <div>
-        <span class="annot">Documents</span>
-        <p><strong>LOG.md</strong>: decisions and, at length, the failures.<br>
+        <span data-i18n="f.docs" class="annot">Documents</span>
+        <p data-i18n="f.docsp"><strong>LOG.md</strong>: decisions and, at length, the failures.<br>
           <strong>DECISIONS.md</strong>: every analysis rule changed after results arrived,
           with what the original rule would have concluded.<br>
           <strong>MODEL_CARD.md</strong>: intended use, and what this must not be used for.</p>
       </div>
       <div>
-        <span class="annot">Source</span>
-        <p>All figures on this page are drawn from
+        <span data-i18n="f.src" class="annot">Source</span>
+        <p data-i18n="f.srcp">All figures on this page are drawn from
           <code>results/full/</code> at build time.</p>
-        <a class="repo-link" href="https://github.com/Lawliet-01/resistance-reversal">Repository →</a>
+        <a data-i18n="f.repo" class="repo-link" href="https://github.com/Lawl1et-1/resistance-reversal">Repository →</a>
       </div>
     </div>
     <p style="margin-top:3rem"><span class="annot" id="provenance-line">Synthetic data · generated from results/full/</span></p>
   </div>
 </footer>
 
+<script src="i18n.fr.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

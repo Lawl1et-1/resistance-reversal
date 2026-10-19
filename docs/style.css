@@ -397,3 +397,25 @@ footer {
   border-left: 1px solid var(--rule-strong);
   padding-left: 1rem;
 }
+
+/* Language toggle: a plate stamp in the corner, in the annotation register rather than
+   a floating pill. */
+.lang-toggle {
+  position: fixed;
+  top: clamp(0.8rem, 2vw, 1.4rem);
+  right: clamp(0.8rem, 2vw, 1.4rem);
+  z-index: 10;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.55rem 0.85rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--plate) 92%, transparent);
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+
+.lang-toggle:hover { background: var(--ink); color: var(--plate); }
+.lang-toggle:focus-visible { outline: 2px solid var(--basin-sen); outline-offset: 2px; }
